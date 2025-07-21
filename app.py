@@ -32,6 +32,8 @@ def load_data():
 df_clean = load_data()
 
 # Sidebar / Entrées utilisateur
+st.title("Stanhome Regional Explorer")
+
 st.sidebar.title("Paramètres de la recherche")
 adresse = st.sidebar.text_input("Adresse de départ", value="Paris")
 rayon = st.sidebar.slider("Rayon de recherche (km)", 10, 400, 200)
@@ -48,7 +50,8 @@ def geocode_adresse(adresse):
             longitude = results[0]['geometry']['lng']
             details = results[0]['components']
             region = details.get('state')
-            return latitude, longitude, region
+            country = results[0]['components'].get('country_code', '').upper()
+            return latitude, longitude, region, country
         else:
             return None, None, None
     except Exception as e:
@@ -57,10 +60,16 @@ def geocode_adresse(adresse):
 
 # --- Recherche uniquement si l'adresse est renseignée
 if adresse:
-    lat, lon, REGION = geocode_adresse(adresse)
+    lat, lon, REGION, country = geocode_adresse(adresse)
     if lat is None:
         st.error("Adresse non trouvée ou géocodage indisponible.")
         st.stop()
+    
+    if country != "FR":
+        st.warning("Attention : l’adresse saisie n’est pas en France. Le radar ne fonctionne que pour la France.")
+        st.stop()
+
+    
     coord_depart = (lat, lon)
 
 
@@ -124,11 +133,30 @@ if adresse:
     st_data = st_folium(m, width=900, height=600)
 
     # tableau des résultats sous la carte
-    df_display = df_filtre[['nom_standard', 'distance_km', 'population', 'reg_nom']].copy()
-    df_display.columns = ["Ville", "Distance (en km)", "Population", "Région"]
-    df_display["Distance (en km)"] = df_display["Distance (en km)"].apply(lambda x: f"{x:.2f}".replace(".", ","))
-    df_display["Population"] = df_display["Population"].apply(lambda x: f"{int(x):,}".replace(",", "."))
+    # df_display = df_filtre[['nom_standard', 'distance_km', 'population', 'reg_nom']].copy()
+    # df_display.columns = ["Ville", "Distance (en km)", "Population", "Région"]
+    # df_display["Distance (en km)"] = df_display["Distance (en km)"].apply(lambda x: f"{x:.2f}".replace(".", ","))
+    # df_display["Population"] = df_display["Population"].apply(lambda x: f"{int(x):,}".replace(",", "."))
 
 
-    st.markdown("#### Détail des villes affichées")
-    st.dataframe(df_display.reset_index(drop=True))
+    # st.markdown("#### Détail des villes affichées")
+    # st.dataframe(df_display.reset_index(drop=True))
+
+    rows = []
+    for _, row in df_display.iterrows():
+        couleur = couleur_par_distance(float(row["Distance (en km)"].replace(",", ".")))
+        ville_html = f'<span style="color:{couleur}; font-weight:bold">{row["Ville"]}</span>'
+        rows.append(f"<tr><td>{ville_html}</td><td>{row['Distance (en km)']} km</td><td>{row['Population']}</td><td>{row['Région']}</td></tr>")
+    
+    table_html = f"""
+    <table>
+    <tr>
+        <th>Ville</th>
+        <th>Distance (en km)</th>
+        <th>Population</th>
+        <th>Région</th>
+    </tr>
+    {''.join(rows)}
+    </table>
+    """
+    st.markdown(table_html, unsafe_allow_html=True)
