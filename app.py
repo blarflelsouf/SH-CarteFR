@@ -46,15 +46,21 @@ except Exception as e:
     st.error(f"Erreur inattendue lors du géocodage : {e}")
     st.stop()
 
-if location is None:
-    st.error("Adresse non trouvée.")
-    st.stop()
 
 # Recherche uniquement si l'adresse est renseignée
 if adresse:
     # Géocodage
     geolocator = Nominatim(user_agent="carte_distance")
-    location = geolocator.geocode(adresse, addressdetails=True)
+    try:
+        location = geolocator.geocode(adresse, addressdetails=True)
+    except GeocoderUnavailable:
+        st.error("Le service de géocodage est temporairement indisponible. Réessayez dans quelques minutes.")
+        st.stop()
+        
+    except Exception as e:
+        st.error(f"Erreur inattendue lors du géocodage : {e}")
+        st.stop()
+        
     if location is None:
         st.error("Adresse non trouvée")
     else:
