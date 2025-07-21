@@ -92,7 +92,7 @@ if adresse:
     m = folium.Map(location=coord_depart, zoom_start=8)
     
     # Génération cercle
-    m = folium.Map(location=coord_depart, zoom_start=8)
+    isochrone_mode = st.sidebar.checkbox("Afficher le mode isochrone (rayon)")
     if isochrone_mode:
         folium.Circle(
             radius=rayon * 1000,  # rayon en mètres
