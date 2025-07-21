@@ -30,7 +30,7 @@ df_clean = load_data()
 
 # Sidebar / Entrées utilisateur
 st.sidebar.title("Paramètres de la recherche")
-adresse = st.sidebar.text_input("Adresse de départ", value="Bordeaux")
+adresse = st.sidebar.text_input("Adresse de départ", value="Paris")
 rayon = st.sidebar.slider("Rayon de recherche (km)", 10, 400, 200)
 min_pop = st.sidebar.number_input("Population minimale", min_value=0, value=10000)
 n = st.sidebar.number_input("Nombre de villes à afficher", min_value=1, max_value=30, value=10)
