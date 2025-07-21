@@ -90,6 +90,18 @@ if adresse:
 
     # Carte folium
     m = folium.Map(location=coord_depart, zoom_start=8)
+    
+    # Génération cercle
+    m = folium.Map(location=coord_depart, zoom_start=8)
+    if isochrone_mode:
+        folium.Circle(
+            radius=rayon * 1000,  # rayon en mètres
+            location=coord_depart,
+            color="purple",
+            fill=True,
+            fill_opacity=0.1,
+            popup=f"{rayon} km autour de {adresse}"
+        ).add_to(m)
 
     # Afficher la région sur la carte
     url_geojson = "https://france-geojson.gregoiredavid.fr/repo/regions.geojson"
@@ -132,6 +144,8 @@ if adresse:
     st.markdown(f"### Carte des {len(df_filtre)} plus grandes villes autour de {adresse}")
     st_data = st_folium(m, width=900, height=600)
 
+    
+
     # tableau des résultats sous la carte
     df_display = df_filtre[['nom_standard', 'distance_km', 'population', 'reg_nom']].copy()
     df_display.columns = ["Ville", "Distance (en km)", "Population", "Région"]
@@ -162,15 +176,20 @@ if adresse:
         ville_html = f'<span style="color:{couleur}; font-weight:bold">{row["Ville"]}</span>'
         rows.append(f"<tr><td>{ville_html}</td><td>{row['Distance (en km)']} km</td><td>{row['Population']}</td><td>{row['Région']}</td></tr>")
     
+    # Tableau HTML dynamique et coloré
     table_html = f"""
-    <table style="width:100%; border-collapse:collapse;">
-    <tr style="background-color:#F0F0F0;">
-        <th>Ville</th>
-        <th>Distance (en km)</th>
-        <th>Population</th>
-        <th>Région</th>
+    <table style="width:100%; border-collapse:collapse; font-size: 1.08em;">
+    <thead>
+    <tr style="background-color:#223366; color:white;">
+        <th style="padding:8px; border:1px solid #AAA;">Ville</th>
+        <th style="padding:8px; border:1px solid #AAA;">Distance (en km)</th>
+        <th style="padding:8px; border:1px solid #AAA;">Population</th>
+        <th style="padding:8px; border:1px solid #AAA;">Région</th>
     </tr>
+    </thead>
+    <tbody>
     {''.join(rows)}
+    </tbody>
     </table>
     """
     st.markdown(table_html, unsafe_allow_html=True)
