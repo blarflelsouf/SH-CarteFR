@@ -9,7 +9,9 @@ pip install -r requirements.txt
 streamlit run app.py
 
 Le fichier `communes-france-2025.csv` doit être placé à la racine du projet.
-Vous le trouverez ici: https://www.data.gouv.fr/datasets/communes-et-villes-de-france-en-csv-excel-json-parquet-et-feather/
+Vous le trouverez ici: https://www.data.gouv.fr/api/1/datasets/r/f5df602b-3800-44d7-b2df-fa40a0350325
+
+ou Le fichier CSV sera téléchargé automatiquement au lancement de l’app si absent. (≈17 Mo)
 
 ## Démo en ligne
 

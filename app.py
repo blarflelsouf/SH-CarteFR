@@ -5,11 +5,24 @@ from geopy.distance import geodesic
 import folium
 from streamlit_folium import st_folium
 import requests
+import urllib.request
+import os
 
 # Chargement CSV une fois pour toutes
+def telecharger_csv_si_absent(fichier, url):
+    if not os.path.exists(fichier):
+        with st.spinner(f"Téléchargement du fichier CSV depuis {url} ..."):
+            urllib.request.urlretrieve(url, fichier)
+        st.success("Téléchargement terminé.")
+
+# Utilisation :
+CSV_URL = "https://www.data.gouv.fr/api/1/datasets/r/f5df602b-3800-44d7-b2df-fa40a0350325"
+CSV_FICHIER = "communes-france-2025.csv"
+telecharger_csv_si_absent(CSV_FICHIER, CSV_URL)
+
 @st.cache_data
 def load_data():
-    df = pd.read_csv('data/communes-france-2025.csv')
+    df = pd.read_csv('communes-france-2025.csv')
     df_clean = df.loc[:, ['nom_standard', 'reg_nom', 'population', 'densite', 'latitude_mairie', 'longitude_mairie', 'grille_densite']]
     return df_clean
 
