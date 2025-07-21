@@ -1,5 +1,5 @@
 streamlit
-geopy
+opencage
 folium
 streamlit-folium
 pandas
