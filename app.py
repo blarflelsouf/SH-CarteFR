@@ -133,13 +133,13 @@ if adresse:
     st_data = st_folium(m, width=900, height=600)
 
     # tableau des résultats sous la carte
-    # df_display = df_filtre[['nom_standard', 'distance_km', 'population', 'reg_nom']].copy()
-    # df_display.columns = ["Ville", "Distance (en km)", "Population", "Région"]
-    # df_display["Distance (en km)"] = df_display["Distance (en km)"].apply(lambda x: f"{x:.2f}".replace(".", ","))
-    # df_display["Population"] = df_display["Population"].apply(lambda x: f"{int(x):,}".replace(",", "."))
+    df_display = df_filtre[['nom_standard', 'distance_km', 'population', 'reg_nom']].copy()
+    df_display.columns = ["Ville", "Distance (en km)", "Population", "Région"]
+    df_display["Distance (en km)"] = df_display["Distance (en km)"].apply(lambda x: f"{x:.2f}".replace(".", ","))
+    df_display["Population"] = df_display["Population"].apply(lambda x: f"{int(x):,}".replace(",", "."))
 
 
-    # st.markdown("#### Détail des villes affichées")
+    st.markdown("#### Détail des villes affichées")
     # st.dataframe(df_display.reset_index(drop=True))
 
     def couleur_par_distance(distance_str):
