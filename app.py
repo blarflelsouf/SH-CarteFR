@@ -3,6 +3,7 @@ import pandas as pd
 from opencage.geocoder import OpenCageGeocode
 from geopy.distance import geodesic
 import folium
+from folium.plugins import HeatMap
 from streamlit_folium import st_folium
 import requests
 import urllib.request
@@ -88,6 +89,24 @@ if adresse:
         else:
             return 'red'
 
+    #Génération heatmap
+    heat_data_pop = [
+        [row['latitude_mairie'], row['longitude_mairie'], row['population']]
+        for _, row in df_filtre.iterrows()
+    ]
+
+    heat_data_dens = [
+        [row['latitude_mairie'], row['longitude_mairie'], row['densite']]
+        for _, row in df_filtre.iterrows()
+    ]
+    
+    heatmap_type = st.sidebar.selectbox(
+        "Afficher une heatmap de…", 
+        options=["Aucune", "Population", "Densité"], 
+        index=0
+    )
+
+    
     # Carte folium
     m = folium.Map(location=coord_depart, zoom_start=8)
     
@@ -103,6 +122,13 @@ if adresse:
             popup=f"{rayon} km autour de {adresse}"
         ).add_to(m)
 
+    #Heatmap affichage
+    if heatmap_type == "Population" and len(heat_data_pop) > 0:
+        HeatMap(heat_data_pop, min_opacity=0.3, radius=25, blur=15, max_zoom=1).add_to(m)
+    elif heatmap_type == "Densité" and len(heat_data_dens) > 0:
+        HeatMap(heat_data_dens, min_opacity=0.3, radius=25, blur=15, max_zoom=1).add_to(m)
+
+    
     # Afficher la région sur la carte
     url_geojson = "https://france-geojson.gregoiredavid.fr/repo/regions.geojson"
     region_geojson_all = requests.get(url_geojson).json()
