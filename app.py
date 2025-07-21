@@ -66,6 +66,7 @@ if adresse:
         st.stop()
     coord_depart = (lat, lon)
 
+
     # Calcul distance pour chaque ville
     df_temp = df_clean[df_clean['population'] > min_pop].copy()
     df_temp['distance_km'] = df_temp.apply(
