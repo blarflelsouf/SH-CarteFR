@@ -7,12 +7,9 @@ from streamlit_folium import st_folium
 import requests
 import urllib.request
 import os
-from dotenv import load_dotenv
 
 
-# Charger variables d'environnement
-load_dotenv()
-OC_API_KEY = os.environ.get('OPENCAGE_API_KEY')
+OC_API_KEY = st.secrets["OPENCAGE_API_KEY"]
 
 # Chargement CSV
 def telecharger_csv_si_absent(fichier, url):
