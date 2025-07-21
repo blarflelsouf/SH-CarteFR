@@ -27,7 +27,7 @@ telecharger_csv_si_absent(CSV_FICHIER, CSV_URL)
 @st.cache_data
 def load_data():
     df = pd.read_csv('communes-france-2025.csv')
-    df_clean = df.loc[:, ['nom_standard', 'reg_nom', 'population', 'latitude_mairie', 'longitude_mairie']]
+    df_clean = df.loc[:, ['nom_standard', 'reg_nom', 'population', 'latitude_mairie', 'longitude_mairie', 'densite']]
     return df_clean
 
 df_clean = load_data()
