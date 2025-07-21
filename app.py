@@ -142,15 +142,29 @@ if adresse:
     # st.markdown("#### Détail des villes affichées")
     # st.dataframe(df_display.reset_index(drop=True))
 
+    def couleur_par_distance(distance_str):
+    # distance_str au format "12,42"
+        try:
+            distance = float(distance_str.replace(",", "."))
+        except:
+            distance = 0
+        if distance < 50:
+            return 'green'
+        elif distance < 120:
+            return 'orange'
+        else:
+            return 'red'
+    
+    # Création du tableau HTML coloré
     rows = []
     for _, row in df_display.iterrows():
-        couleur = couleur_par_distance(float(row["Distance (en km)"].replace(",", ".")))
+        couleur = couleur_par_distance(row["Distance (en km)"])
         ville_html = f'<span style="color:{couleur}; font-weight:bold">{row["Ville"]}</span>'
         rows.append(f"<tr><td>{ville_html}</td><td>{row['Distance (en km)']} km</td><td>{row['Population']}</td><td>{row['Région']}</td></tr>")
     
     table_html = f"""
-    <table>
-    <tr>
+    <table style="width:100%; border-collapse:collapse;">
+    <tr style="background-color:#F0F0F0;">
         <th>Ville</th>
         <th>Distance (en km)</th>
         <th>Population</th>
