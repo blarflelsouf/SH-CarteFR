@@ -36,16 +36,6 @@ rayon = st.sidebar.slider("Rayon de recherche (km)", 10, 400, 200)
 min_pop = st.sidebar.number_input("Population minimale", min_value=0, value=10000)
 n = st.sidebar.number_input("Nombre de villes à afficher", min_value=1, max_value=30, value=10)
 
-#
-try:
-    location = geolocator.geocode(adresse, addressdetails=True, timeout=10)
-except GeocoderUnavailable:
-    st.error("Le service de géocodage est temporairement indisponible. Réessayez dans quelques minutes.")
-    st.stop()
-except Exception as e:
-    st.error(f"Erreur inattendue lors du géocodage : {e}")
-    st.stop()
-
 
 # Recherche uniquement si l'adresse est renseignée
 if adresse:
