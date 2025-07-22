@@ -152,7 +152,7 @@ if adresse:
         ).add_to(m)
 
     # Marker de départ
-    big_icon_url = "https://raw.githubusercontent.com/blarflelsouf/SH-CarteFR/refs/heads/master/logo.png"
+    big_icon_url = "https://raw.githubusercontent.com/blarflelsouf/SH-CarteFR/refs/heads/master/logopng.png"
     custom_icon = folium.CustomIcon(
         big_icon_url,
         icon_size=(100, 100),  # Largeur, hauteur en pixels
