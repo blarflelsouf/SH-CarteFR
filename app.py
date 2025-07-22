@@ -8,6 +8,7 @@ from streamlit_folium import st_folium
 import requests
 import urllib.request
 import os
+import numpy as np
 
 
 OC_API_KEY = st.secrets["OPENCAGE_API_KEY"]
