@@ -95,13 +95,15 @@ if adresse:
 
     
     # Calcul distance pour chaque grande ville
-    df_temp = df_clean[df_clean['population'] > min_pop].copy()
-    
-    df_temp['distance_km'] = df_temp.apply(
-        lambda row: geodesic(coord_depart, (row['latitude_mairie'], row['longitude_mairie'])).km, axis=1)
-    df_filtre = df_temp[df_temp['distance_km'] <= rayon].sort_values('population', ascending=False).head(n)
-
-    
+    @st.cache.data
+    def gd_villes_dans_rayon(df_clean, coord_depart, rayon):
+        df_temp = df_clean[df_clean['population'] > min_pop].copy()
+        df_temp['distance_km'] = df_temp.apply(
+            lambda row: geodesic(coord_depart, (row['latitude_mairie'], row['longitude_mairie'])).km, axis=1)
+        df_filtre = df_temp[df_temp['distance_km'] <= rayon].sort_values('population', ascending=False).head(n)
+        return df_filtre
+        
+    df_filtre = gd_villes_dans_rayon(df_clean, coord_depart, rayon)
 
     # Fonction couleur distance
     def couleur_par_distance(distance):
