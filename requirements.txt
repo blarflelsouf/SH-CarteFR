@@ -5,3 +5,4 @@ streamlit-folium
 pandas
 requests
 geopy
+numpy
