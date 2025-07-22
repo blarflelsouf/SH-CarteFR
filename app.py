@@ -100,7 +100,7 @@ if adresse:
         df_filtre = df_temp[df_temp['distance_km'] <= rayon].sort_values('population', ascending=False).head(n)
         return df_filtre
         
-    df_filtre = gd_villes_dans_rayon(df_clean, coord_depart, rayon
+    df_filtre = gd_villes_dans_rayon(df_clean, coord_depart, rayon)
 
     population_totale_gd_ville = int(df_filtre['population'].sum())
     population_totale_gd_ville_str = f"{population_totale:,}".replace(",", ".")                            
