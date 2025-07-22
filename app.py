@@ -152,7 +152,7 @@ if adresse:
         ).add_to(m)
 
     # Marker de départ
-    big_icon_url = "https://cdn-icons-png.flaticon.com/512/684/684908.png"
+    big_icon_url = "https://www.google.com/url?sa=i&url=https%3A%2F%2Fwww.pngegg.com%2Ffr%2Fpng-zgxef&psig=AOvVaw16OPdUQBsM952MvAKaZ5-4&ust=1753287477221000&source=images&cd=vfe&opi=89978449&ved=0CBUQjRxqFwoTCMCZo__u0I4DFQAAAAAdAAAAABAE"
     custom_icon = folium.CustomIcon(
         big_icon_url,
         icon_size=(50, 50),  # Largeur, hauteur en pixels
