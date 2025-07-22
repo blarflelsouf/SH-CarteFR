@@ -91,7 +91,7 @@ if adresse:
     
 
     
-    # Calcul distance pour chaque grande ville
+    # Calcul distance pour chaque grande ville et agglomération des villes proches
     @st.cache_data
     def gd_villes_dans_rayon(df_clean, coord_depart, rayon, n):
         df_temp = df_clean[df_clean['population'] > min_pop].copy()
@@ -138,7 +138,7 @@ if adresse:
     
         # Trie par population totale
         agglo = agglo.sort_values('Population', ascending=False).head(n).reset_index(drop=True)
-    return agglo
+        return agglo
 
     
     df_filtre = gd_villes_dans_rayon(df_clean, coord_depart, rayon, n)
