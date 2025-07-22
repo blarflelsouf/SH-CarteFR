@@ -93,7 +93,7 @@ if adresse:
     
     # Calcul distance pour chaque grande ville et agglomération des villes proches
     @st.cache_data
-    def gd_villes_dans_rayon(df_clean, coord_depart, rayon, n):
+    def gd_villes_dans_rayon(df_clean, coord_depart, rayon, min_pop, n):
         df_temp = df_clean[df_clean['population'] > min_pop].copy()
         df_temp['distance_km'] = df_temp.apply(
             lambda row: geodesic(coord_depart, (row['latitude_mairie'], row['longitude_mairie'])).km, axis=1)
@@ -141,7 +141,7 @@ if adresse:
         return agglo
 
     
-    df_filtre = gd_villes_dans_rayon(df_clean, coord_depart, rayon, n)
+    df_filtre = gd_villes_dans_rayon(df_clean, coord_depart, rayon, min_pop, n)
 
     population_totale_gd_ville = int(df_filtre['population'].sum())
     population_totale_gd_ville_str = f"{population_totale_gd_ville:,}".replace(",", ".")                            
