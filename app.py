@@ -106,7 +106,7 @@ if adresse:
     population_totale_gd_ville_str = f"{population_totale:,}".replace(",", ".")                            
                                      
     df_stats = pd.DataFrame({
-        "Indicateur": ["Nombre total de villes dans le rayon", "Population totale dans le rayon", "Population totale des grandes villes],
+        "Indicateur": ["Nombre total de villes dans le rayon", "Population totale dans le rayon", "Population totale des grandes villes"],
         "Valeur": [nombre_total_villes, population_totale_str, population_totale_gd_ville_str]
     })
 
