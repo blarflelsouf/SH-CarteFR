@@ -160,7 +160,7 @@ if adresse:
     if df_filtre.empty:
         st.warning("Aucune agglomération trouvée dans le rayon et avec la population minimale sélectionnée.")
         st.stop()
-    population_totale_gd_ville = int(df_filtre['Population'].sum())
+    population_totale_gd_ville = int(df_filtre['population'].sum())
     population_totale_gd_ville_str = f"{population_totale_gd_ville:,}".replace(",", ".")
     df_stats = pd.DataFrame({
         "Indicateur": ["Nombre total de villes dans le rayon", "Population totale dans le rayon", "Population totale des grandes villes"],
@@ -170,9 +170,9 @@ if adresse:
     m = folium.Map(location=coord_depart, zoom_start=8)
     # Heatmap (optionnelle)
     heat_data_pop = [
-        [row['Latitude'], row['Longitude'], row['Population']]
+        [row['Latitude'], row['Longitude'], row['population']]
         for _, row in df_filtre.iterrows()
-        if row['Population'] > 0
+        if row['population'] > 0
     ]
     heatmap_pop = st.sidebar.checkbox("Afficher le mode heatmap")
     if heatmap_pop and len(heat_data_pop) >= 2:
