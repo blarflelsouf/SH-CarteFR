@@ -70,15 +70,35 @@ if adresse:
         st.warning("Attention : l’adresse saisie n’est pas en France. Le radar ne fonctionne que pour la France.")
         st.stop()
 
-    
+    # 
     coord_depart = (lat, lon)
 
+    
+    # Calcul pop et nbr de villes pour chaque ville dans le rayon
+    df_all_in_radius = df_clean.copy()
+    df_all_in_radius['distance_km'] = df_all_in_radius.apply(
+        lambda row: geodesic(coord_depart, (row['latitude_mairie'], row['longitude_mairie'])).km, axis=1)
+    df_all_in_radius = df_all_in_radius[df_all_in_radius['distance_km'] <= rayon]
+    
+    nombre_total_villes = len(df_all_in_radius)
+    population_totale = int(df_all_in_radius['population'].sum())
+    population_totale_str = f"{population_totale:,}".replace(",", ".")
 
-    # Calcul distance pour chaque ville
+    df_stats = pd.DataFrame({
+        "Indicateur": ["Nombre total de villes dans le rayon", "Population totale dans le rayon"],
+        "Valeur": [nombre_total_villes, population_totale_str]
+    })
+
+    
+    # Calcul distance pour chaque grande ville
     df_temp = df_clean[df_clean['population'] > min_pop].copy()
+    df_temp
+    
     df_temp['distance_km'] = df_temp.apply(
         lambda row: geodesic(coord_depart, (row['latitude_mairie'], row['longitude_mairie'])).km, axis=1)
     df_filtre = df_temp[df_temp['distance_km'] <= rayon].sort_values('population', ascending=False).head(n)
+
+    
 
     # Fonction couleur distance
     def couleur_par_distance(distance):
@@ -215,3 +235,6 @@ if adresse:
     </table>
     """
     st.markdown(table_html, unsafe_allow_html=True)
+
+    st.markdown("#### Synthèse dans le rayon (toutes villes confondues)")
+    st.dataframe(df_stats, hide_index=True)
