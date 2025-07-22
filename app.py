@@ -155,8 +155,8 @@ if adresse:
     big_icon_url = "https://i.pinimg.com/474x/af/68/9a/af689a420c682cded8966ba51ad1a3d9.jpg"
     custom_icon = folium.CustomIcon(
         big_icon_url,
-        icon_size=(50, 50),  # Largeur, hauteur en pixels
-        icon_anchor=(25, 50)  # Position de la pointe (centre bas ici)
+        icon_size=(100, 100),  # Largeur, hauteur en pixels
+        icon_anchor=(50, 100)  # Position de la pointe (centre bas ici)
     )
     
     folium.Marker(
