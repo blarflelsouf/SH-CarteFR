@@ -152,10 +152,10 @@ if adresse:
         ).add_to(m)
 
     # Marker de départ
-    big_icon_url = "https://www.google.com/url?sa=i&url=https%3A%2F%2Fwww.pngegg.com%2Ffr%2Fpng-zgxef&psig=AOvVaw16OPdUQBsM952MvAKaZ5-4&ust=1753287477221000&source=images&cd=vfe&opi=89978449&ved=0CBUQjRxqFwoTCMCZo__u0I4DFQAAAAAdAAAAABAE"
+    big_icon_url = "https://e7.pngegg.com/pngimages/567/857/png-clipart-red-and-gray-lever-marker-pen-computer-icons-location-place-tag-s-angle-sphere.png"
     custom_icon = folium.CustomIcon(
         big_icon_url,
-        icon_size=(900, 800),  # Largeur, hauteur en pixels
+        icon_size=(50, 50),  # Largeur, hauteur en pixels
         icon_anchor=(25, 50)  # Position de la pointe (centre bas ici)
     )
     
