@@ -75,11 +75,15 @@ if adresse:
 
     
     # Calcul pop et nbr de villes pour chaque ville dans le rayon
-    df_all_in_radius = df_clean.copy()
-    df_all_in_radius['distance_km'] = df_all_in_radius.apply(
-        lambda row: geodesic(coord_depart, (row['latitude_mairie'], row['longitude_mairie'])).km, axis=1)
-    df_all_in_radius = df_all_in_radius[df_all_in_radius['distance_km'] <= rayon]
-    
+    @st.cache_data
+    def villes_dans_rayon(df_clean, coord_depart, rayon):
+        df_all_in_radius = df_clean.copy()
+        df_all_in_radius['distance_km'] = df_all_in_radius.apply(
+            lambda row: geodesic(coord_depart, (row['latitude_mairie'], row['longitude_mairie'])).km, axis=1)
+        df_all_in_radius = df_all_in_radius[df_all_in_radius['distance_km'] <= rayon]
+        return df_all_in_radius
+
+    df_all_in_radius = villes_dans_rayon(df_clean, coord_depart, rayon)
     nombre_total_villes = len(df_all_in_radius)
     population_totale = int(df_all_in_radius['population'].sum())
     population_totale_str = f"{population_totale:,}".replace(",", ".")
@@ -118,7 +122,7 @@ if adresse:
     ]
 
     heatmap_pop = st.sidebar.checkbox(
-        "Afficher le mdoe heatmap"
+        "Afficher le mode heatmap"
     )
     if heatmap_pop:
         HeatMap(heat_data_pop, min_opacity=0.3, radius=25, blur=15, max_zoom=1).add_to(m)
