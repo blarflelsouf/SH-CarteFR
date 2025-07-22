@@ -141,14 +141,7 @@ adresse = st.sidebar.text_input("Adresse de départ", value="Paris")
 rayon = st.sidebar.slider("Rayon de recherche (km)", 10, 400, 200)
 min_pop = st.sidebar.number_input("Population minimale", min_value=0, value=10000)
 n = st.sidebar.number_input("Nombre d'agglomérations à afficher", min_value=1, max_value=30, value=10)
-st.sidebar.markdown("---")
-st.sidebar.markdown("#### Légende des marqueurs")
-st.sidebar.markdown("""
-<span style='display:inline-block; width:16px; height:16px; background-color:purple; border-radius:50%; margin-right:8px;'></span> <b>Départ (violet)</b><br>
-<span style='display:inline-block; width:16px; height:16px; background-color:green; border-radius:50%; margin-right:8px;'></span> <b>&lt; 50 km</b><br>
-<span style='display:inline-block; width:16px; height:16px; background-color:orange; border-radius:50%; margin-right:8px;'></span> <b>&lt; 120 km</b><br>
-<span style='display:inline-block; width:16px; height:16px; background-color:red; border-radius:50%; margin-right:8px;'></span> <b>&gt; 120 km</b>
-""", unsafe_allow_html=True)
+
 
 
 # L'utilisateur lance la recherche seulement si une adresse est fournie
@@ -283,3 +276,13 @@ if adresse:
     # Tableau synthèse sous le HTML
     st.markdown("#### Synthèse dans le rayon (toutes villes confondues)")
     st.dataframe(df_stats, hide_index=True)
+
+    # Légende des markers
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("#### Légende des marqueurs")
+    st.sidebar.markdown("""
+    <span style='display:inline-block; width:16px; height:16px; background-color:purple; border-radius:50%; margin-right:8px;'></span> <b>Départ (violet)</b><br>
+    <span style='display:inline-block; width:16px; height:16px; background-color:green; border-radius:50%; margin-right:8px;'></span> <b>&lt; 50 km</b><br>
+    <span style='display:inline-block; width:16px; height:16px; background-color:orange; border-radius:50%; margin-right:8px;'></span> <b>&lt; 120 km</b><br>
+    <span style='display:inline-block; width:16px; height:16px; background-color:red; border-radius:50%; margin-right:8px;'></span> <b>&gt; 120 km</b>
+    """, unsafe_allow_html=True)
