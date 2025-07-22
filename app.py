@@ -54,14 +54,17 @@ def villes_dans_rayon(df_clean, coord_depart, rayon):
 def gd_villes_dans_rayon(df_clean, coord_depart, rayon, min_pop, n):
     # Filtre population
     df_temp = df_clean[df_clean['population'] > min_pop].copy()
+    
     # Calcul de la distance à l'adresse de départ
     df_temp['distance_km'] = df_temp.apply(
         lambda row: geodesic(coord_depart, (row['latitude_mairie'], row['longitude_mairie'])).km, axis=1)
+    
     # On garde les villes dans le cercle
     df_temp = df_temp[df_temp['distance_km'] <= rayon].reset_index(drop=True)
     N = len(df_temp)
     if N == 0:
         return pd.DataFrame()
+        
     # Algorithme "maison" de clustering spatial (agglomération = groupe de villes à <15 km)
     group_ids = np.full(N, -1)
     current_group = 0
@@ -138,6 +141,15 @@ adresse = st.sidebar.text_input("Adresse de départ", value="Paris")
 rayon = st.sidebar.slider("Rayon de recherche (km)", 10, 400, 200)
 min_pop = st.sidebar.number_input("Population minimale", min_value=0, value=10000)
 n = st.sidebar.number_input("Nombre d'agglomérations à afficher", min_value=1, max_value=30, value=10)
+st.sidebar.markdown("---")
+st.sidebar.markdown("#### Légende des marqueurs")
+st.sidebar.markdown("""
+<span style='display:inline-block; width:16px; height:16px; background-color:purple; border-radius:50%; margin-right:8px;'></span> <b>Départ (violet)</b><br>
+<span style='display:inline-block; width:16px; height:16px; background-color:green; border-radius:50%; margin-right:8px;'></span> <b>&lt; 50 km</b><br>
+<span style='display:inline-block; width:16px; height:16px; background-color:orange; border-radius:50%; margin-right:8px;'></span> <b>&lt; 120 km</b><br>
+<span style='display:inline-block; width:16px; height:16px; background-color:red; border-radius:50%; margin-right:8px;'></span> <b>&gt; 120 km</b>
+""", unsafe_allow_html=True)
+
 
 # L'utilisateur lance la recherche seulement si une adresse est fournie
 if adresse:
@@ -150,11 +162,13 @@ if adresse:
         st.warning("Attention : l’adresse saisie n’est pas en France. Le radar ne fonctionne que pour la France.")
         st.stop()
     coord_depart = (lat, lon)
+    
     # Calcul des totaux dans le rayon
     df_all_in_radius = villes_dans_rayon(df_clean, coord_depart, rayon)
     nombre_total_villes = len(df_all_in_radius)
     population_totale = int(df_all_in_radius['population'].sum())
     population_totale_str = f"{population_totale:,}".replace(",", ".")
+    
     # Calcul grandes villes/agglos (filtre pop, groupement spatial)
     df_filtre = gd_villes_dans_rayon(df_clean, coord_depart, rayon, min_pop, n)
     if df_filtre.empty:
@@ -166,8 +180,10 @@ if adresse:
         "Indicateur": ["Nombre total de villes dans le rayon", "Population totale dans le rayon", "Population totale des grandes villes"],
         "Valeur": [nombre_total_villes, population_totale_str, population_totale_gd_ville_str]
     })
+    
     # Affichage de la carte Folium
     m = folium.Map(location=coord_depart, zoom_start=8)
+    
     # Heatmap (optionnelle)
     heat_data_pop = [
         [row['Latitude'], row['Longitude'], row['Population']]
@@ -177,6 +193,7 @@ if adresse:
     heatmap_pop = st.sidebar.checkbox("Afficher le mode heatmap")
     if heatmap_pop and len(heat_data_pop) >= 2:
         HeatMap(heat_data_pop, min_opacity=0.3, radius=25, blur=15).add_to(m)
+        
     # Isochrone visuel
     isochrone_mode = st.sidebar.checkbox("Afficher le mode isochrone (rayon)")
     if isochrone_mode:
@@ -188,6 +205,7 @@ if adresse:
             fill_opacity=0.1,
             popup=f"{rayon} km autour de {adresse}"
         ).add_to(m)
+        
     # Affichage région GeoJSON
     url_geojson = "https://france-geojson.gregoiredavid.fr/repo/regions.geojson"
     region_geojson_all = requests.get(url_geojson).json()
@@ -209,6 +227,7 @@ if adresse:
             name="Frontière région",
             highlight_function=lambda x: {'weight': 3, 'color': 'yellow'},
         ).add_to(m)
+        
     # Marker de départ (icône custom)
     big_icon_url = "https://raw.githubusercontent.com/blarflelsouf/SH-CarteFR/master/logopng.png"
     custom_icon = folium.CustomIcon(
@@ -221,6 +240,7 @@ if adresse:
         popup="Départ",
         icon=custom_icon
     ).add_to(m)
+    
     # Markers villes/agglos principales
     for _, row in df_filtre.iterrows():
         couleur = couleur_par_distance(row['Distance (en km)'])
@@ -231,10 +251,12 @@ if adresse:
         ).add_to(m)
     st.markdown(f"### Carte des {len(df_filtre)} plus grandes agglomérations autour de {adresse}")
     st_data = st_folium(m, width=900, height=600)
+    
     # Préparation du tableau HTML coloré
     df_display = df_filtre[['Ville', 'Distance (en km)', 'Population', 'Région']].copy()
     df_display["Distance (en km)"] = df_display["Distance (en km)"].apply(lambda x: f"{x:.2f}".replace(".", ","))
     df_display["Population"] = df_display["Population"].apply(lambda x: f"{int(x):,}".replace(",", "."))
+    
     # Génération du HTML avec couleurs sur Ville
     rows = []
     for _, row in df_display.iterrows():
@@ -257,6 +279,7 @@ if adresse:
     </table>
     """
     st.markdown(table_html, unsafe_allow_html=True)
+    
     # Tableau synthèse sous le HTML
     st.markdown("#### Synthèse dans le rayon (toutes villes confondues)")
     st.dataframe(df_stats, hide_index=True)
