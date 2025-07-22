@@ -89,22 +89,21 @@ if adresse:
         else:
             return 'red'
 
+    # Carte folium
+    m = folium.Map(location=coord_depart, zoom_start=8)
+    
     #Génération heatmap
     heat_data_pop = [
         [row['latitude_mairie'], row['longitude_mairie'], row['population']]
         for _, row in df_filtre.iterrows()
     ]
 
-    
     heatmap_pop = st.sidebar.checkbox(
         "Afficher le mdoe heatmap"
     )
     if heatmap_pop:
         HeatMap(heat_data_pop, min_opacity=0.3, radius=25, blur=15, max_zoom=1).add_to(m)
 
-    
-    # Carte folium
-    m = folium.Map(location=coord_depart, zoom_start=8)
     
     # Génération cercle
     isochrone_mode = st.sidebar.checkbox("Afficher le mode isochrone (rayon)")
@@ -145,8 +144,8 @@ if adresse:
     big_icon_url = "https://raw.githubusercontent.com/blarflelsouf/SH-CarteFR/refs/heads/master/logopng.png"
     custom_icon = folium.CustomIcon(
         big_icon_url,
-        icon_size=(50, 50),  # Largeur, hauteur en pixels
-        icon_anchor=(25, 50)  # Position de la pointe (centre bas ici)
+        icon_size=(60, 60),  # Largeur, hauteur en pixels
+        icon_anchor=(30, 60)  # Position de la pointe (centre bas ici)
     )
     
     folium.Marker(
