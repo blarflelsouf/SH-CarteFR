@@ -92,7 +92,6 @@ if adresse:
     
     # Calcul distance pour chaque grande ville
     df_temp = df_clean[df_clean['population'] > min_pop].copy()
-    df_temp
     
     df_temp['distance_km'] = df_temp.apply(
         lambda row: geodesic(coord_depart, (row['latitude_mairie'], row['longitude_mairie'])).km, axis=1)
