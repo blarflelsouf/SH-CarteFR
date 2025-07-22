@@ -88,10 +88,7 @@ if adresse:
     population_totale = int(df_all_in_radius['population'].sum())
     population_totale_str = f"{population_totale:,}".replace(",", ".")
 
-    df_stats = pd.DataFrame({
-        "Indicateur": ["Nombre total de villes dans le rayon", "Population totale dans le rayon"],
-        "Valeur": [nombre_total_villes, population_totale_str]
-    })
+    
 
     
     # Calcul distance pour chaque grande ville
@@ -103,8 +100,17 @@ if adresse:
         df_filtre = df_temp[df_temp['distance_km'] <= rayon].sort_values('population', ascending=False).head(n)
         return df_filtre
         
-    df_filtre = gd_villes_dans_rayon(df_clean, coord_depart, rayon)
+    df_filtre = gd_villes_dans_rayon(df_clean, coord_depart, rayon
 
+    population_totale_gd_ville = int(df_filtre['population'].sum())
+    population_totale_gd_ville_str = f"{population_totale:,}".replace(",", ".")                            
+                                     
+    df_stats = pd.DataFrame({
+        "Indicateur": ["Nombre total de villes dans le rayon", "Population totale dans le rayon", "Population totale des grandes villes],
+        "Valeur": [nombre_total_villes, population_totale_str, population_totale_gd_ville_str]
+    })
+
+    
     # Fonction couleur distance
     def couleur_par_distance(distance):
         if distance < 50:
