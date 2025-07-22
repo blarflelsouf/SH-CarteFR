@@ -27,7 +27,7 @@ telecharger_csv_si_absent(CSV_FICHIER, CSV_URL)
 @st.cache_data
 def load_data():
     df = pd.read_csv('communes-france-2025.csv')
-    df_clean = df.loc[:, ['nom_standard', 'reg_nom', 'population', 'latitude_mairie', 'longitude_mairie', 'densite']]
+    df_clean = df.loc[:, ['nom_standard', 'reg_nom', 'population', 'latitude_mairie', 'longitude_mairie']]
     return df_clean
 
 df_clean = load_data()
@@ -95,16 +95,12 @@ if adresse:
         for _, row in df_filtre.iterrows()
     ]
 
-    heat_data_dens = [
-        [row['latitude_mairie'], row['longitude_mairie'], row['densite']]
-        for _, row in df_filtre.iterrows()
-    ]
     
-    heatmap_type = st.sidebar.selectbox(
-        "Afficher une heatmap de…", 
-        options=["Aucune", "Population", "Densité"], 
-        index=0
+    heatmap_pop = st.sidebar.checkbox(
+        "Afficher le mdoe heatmap"
     )
+    if heatmap_pop:
+        HeatMap(heat_data_pop, min_opacity=0.3, radius=25, blur=15, max_zoom=1).add_to(m)
 
     
     # Carte folium
@@ -121,12 +117,6 @@ if adresse:
             fill_opacity=0.1,
             popup=f"{rayon} km autour de {adresse}"
         ).add_to(m)
-
-    #Heatmap affichage
-    if heatmap_type == "Population" and len(heat_data_pop) > 0:
-        HeatMap(heat_data_pop, min_opacity=0.3, radius=25, blur=15, max_zoom=1).add_to(m)
-    elif heatmap_type == "Densité" and len(heat_data_dens) > 0:
-        HeatMap(heat_data_dens, min_opacity=0.3, radius=25, blur=15, max_zoom=1).add_to(m)
 
     
     # Afficher la région sur la carte
@@ -155,8 +145,8 @@ if adresse:
     big_icon_url = "https://raw.githubusercontent.com/blarflelsouf/SH-CarteFR/refs/heads/master/logopng.png"
     custom_icon = folium.CustomIcon(
         big_icon_url,
-        icon_size=(100, 100),  # Largeur, hauteur en pixels
-        icon_anchor=(50, 100)  # Position de la pointe (centre bas ici)
+        icon_size=(50, 50),  # Largeur, hauteur en pixels
+        icon_anchor=(25, 50)  # Position de la pointe (centre bas ici)
     )
     
     folium.Marker(
