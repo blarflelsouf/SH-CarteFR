@@ -93,14 +93,55 @@ if adresse:
     
     # Calcul distance pour chaque grande ville
     @st.cache_data
-    def gd_villes_dans_rayon(df_clean, coord_depart, rayon):
+    def gd_villes_dans_rayon(df_clean, coord_depart, rayon, n):
         df_temp = df_clean[df_clean['population'] > min_pop].copy()
         df_temp['distance_km'] = df_temp.apply(
             lambda row: geodesic(coord_depart, (row['latitude_mairie'], row['longitude_mairie'])).km, axis=1)
-        df_filtre = df_temp[df_temp['distance_km'] <= rayon].sort_values('population', ascending=False).head(n)
-        return df_filtre
-        
-    df_filtre = gd_villes_dans_rayon(df_clean, coord_depart, rayon)
+        df_temp = df_temp[df_temp['distance_km'] <= rayon].reset_index(drop=True)
+        N = len(df_temp)
+        group_ids = np.full(N, -1)
+        current_group = 0
+    
+        for i in range(N):
+            if group_ids[i] != -1:
+                continue  # déjà groupé
+            group_ids[i] = current_group
+            group_stack = [i]
+            while group_stack:
+                idx = group_stack.pop()
+                lat1, lon1 = df_temp.loc[idx, ['latitude_mairie', 'longitude_mairie']]
+                for j in range(N):
+                    if group_ids[j] != -1:
+                        continue
+                    lat2, lon2 = df_temp.loc[j, ['latitude_mairie', 'longitude_mairie']]
+                    distance = geodesic((lat1, lon1), (lat2, lon2)).km
+                    if distance < 15:
+                        group_ids[j] = current_group
+                        group_stack.append(j)
+            current_group += 1
+    
+        df_temp['agglomeration'] = group_ids
+    
+        # Agglo = nom de la ville la + grosse, distance au départ, somme des populations, région principale
+        agglo = (
+            df_temp.groupby('agglomeration')
+            .apply(lambda g: pd.Series({
+                'Ville': g.loc[g['population'].idxmax()]['nom_standard'],
+                'Latitude': g.loc[g['population'].idxmax()]['latitude_mairie'],
+                'Longitude': g.loc[g['population'].idxmax()]['longitude_mairie'],
+                'Distance (en km)': g.loc[g['population'].idxmax()]['distance_km'],
+                'Population': int(g['population'].sum()),
+                'Région': g['reg_nom'].mode()[0]
+            }))
+            .reset_index(drop=True)
+        )
+    
+        # Trie par population totale
+        agglo = agglo.sort_values('Population', ascending=False).head(n).reset_index(drop=True)
+    return agglo
+
+    
+    df_filtre = gd_villes_dans_rayon(df_clean, coord_depart, rayon, n)
 
     population_totale_gd_ville = int(df_filtre['population'].sum())
     population_totale_gd_ville_str = f"{population_totale_gd_ville:,}".replace(",", ".")                            
