@@ -152,10 +152,17 @@ if adresse:
         ).add_to(m)
 
     # Marker de départ
+    big_icon_url = "https://i.pinimg.com/474x/af/68/9a/af689a420c682cded8966ba51ad1a3d9.jpg"
+    custom_icon = folium.CustomIcon(
+        big_icon_url,
+        icon_size=(100, 100),  # Largeur, hauteur en pixels
+        icon_anchor=(50, 100)  # Position de la pointe (centre bas ici)
+    )
+    
     folium.Marker(
         location=coord_depart,
         popup="Départ",
-        icon=folium.Icon(color='blue')
+        icon=custom_icon
     ).add_to(m)
 
     # Markers villes
