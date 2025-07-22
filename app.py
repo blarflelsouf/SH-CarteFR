@@ -144,7 +144,7 @@ if adresse:
             style_function=lambda feature: {
                 'fillColor': 'none',
                 'color': 'blue',
-                'weight': 2,
+                'weight': 5,
                 'dashArray': '5, 5'
             },
             name="Frontière région",
