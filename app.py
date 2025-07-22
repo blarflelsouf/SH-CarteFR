@@ -103,7 +103,7 @@ if adresse:
     df_filtre = gd_villes_dans_rayon(df_clean, coord_depart, rayon)
 
     population_totale_gd_ville = int(df_filtre['population'].sum())
-    population_totale_gd_ville_str = f"{population_totale:,}".replace(",", ".")                            
+    population_totale_gd_ville_str = f"{population_totale_gd_ville:,}".replace(",", ".")                            
                                      
     df_stats = pd.DataFrame({
         "Indicateur": ["Nombre total de villes dans le rayon", "Population totale dans le rayon", "Population totale des grandes villes"],
