@@ -144,7 +144,7 @@ if adresse:
             style_function=lambda feature: {
                 'fillColor': 'none',
                 'color': 'blue',
-                'weight': 5,
+                'weight': 2,
                 'dashArray': '5, 5'
             },
             name="Frontière région",
@@ -152,10 +152,17 @@ if adresse:
         ).add_to(m)
 
     # Marker de départ
+    big_icon_url = "https://cdn-icons-png.flaticon.com/512/684/684908.png"
+    custom_icon = folium.CustomIcon(
+        big_icon_url,
+        icon_size=(50, 50),  # Largeur, hauteur en pixels
+        icon_anchor=(25, 50)  # Position de la pointe (centre bas ici)
+    )
+    
     folium.Marker(
         location=coord_depart,
         popup="Départ",
-        icon=folium.Icon(color='blue')
+        icon=custom_icon
     ).add_to(m)
 
     # Markers villes
