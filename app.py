@@ -95,7 +95,7 @@ if adresse:
 
     
     # Calcul distance pour chaque grande ville
-    @st.cache.data
+    @st.cache_data
     def gd_villes_dans_rayon(df_clean, coord_depart, rayon):
         df_temp = df_clean[df_clean['population'] > min_pop].copy()
         df_temp['distance_km'] = df_temp.apply(
