@@ -195,8 +195,7 @@ if adresse:
         )
         polygone_recherche = shape(iso['features'][0]['geometry'])
         dmax = rayon_max_isochrone(polygone_recherche, coord_depart)
-        villes_candidates = villes_dans_rayon_km(df_clean, coord_depart, dmax + 5)
-        df_all_in_radius = villes_dans_isochrone(villes_candidates, polygone_recherche)
+        df_all_in_radius = villes_dans_rayon_km(df_clean, coord_depart, dmax + 5)
         df_filtre = gd_villes_dans_isochrone(villes_candidates, min_pop, n, polygone_recherche)
 
     nombre_total_villes = len(df_all_in_radius)
