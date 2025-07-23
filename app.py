@@ -191,6 +191,20 @@ if adresse:
         st.stop()
     coord_depart = (lat, lon)
     coord_depart_lonlat = (lon, lat)
+
+    #Calcul temps de trajet
+    polygone_recherche = None
+    if mode_recherche == "Rayon (km)":
+        pass  # polygone inutile
+    else:
+        iso = ors_client.isochrones(
+            locations=[coord_depart_lonlat],
+            profile='driving-car',
+            range=[temps_min * 60],
+            intervals=[temps_min * 60],
+            units='m'
+        )
+        polygone_recherche = shape(iso['features'][0]['geometry'])
     
     # Calcul des totaux dans le rayon en km
     df_all_in_radius = villes_dans_rayon(df_clean, coord_depart, rayon if mode_recherche=="Rayon (km)" else None, mode_recherche, polygone_isochrone=polygone_recherche)
@@ -212,19 +226,6 @@ if adresse:
         "Valeur": [nombre_total_villes, population_totale_str, population_totale_gd_ville_str]
     })
 
-    #Calcul temps de trajet
-    polygone_recherche = None
-    if mode_recherche == "Rayon (km)":
-        pass  # polygone inutile
-    else:
-        iso = ors_client.isochrones(
-            locations=[coord_depart_lonlat],
-            profile='driving-car',
-            range=[temps_min * 60],
-            intervals=[temps_min * 60],
-            units='m'
-        )
-        polygone_recherche = shape(iso['features'][0]['geometry'])
     
     # Affichage de la carte Folium
     m = folium.Map(location=coord_depart, zoom_start=8)
