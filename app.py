@@ -45,7 +45,6 @@ def load_data():
 # =======================
 
 # Calcul des villes dans le rayon sans critère de population (totaux synthèse)
-@st.cache_data
 def villes_dans_rayon(df_clean, coord_depart, rayon, mode_recherche, polygone_isochrone=None):
     df_all_in_radius = df_clean.copy()
     if mode_recherche == "Rayon (km)":
@@ -65,7 +64,6 @@ def villes_dans_rayon(df_clean, coord_depart, rayon, mode_recherche, polygone_is
 
 
 # Calcul des agglomérations de grandes villes (regroupement spatial <15 km)
-@st.cache_data
 def gd_villes_dans_rayon(df_clean, coord_depart, rayon, min_pop, n, mode_recherche, polygone_isochrone=None):
     # Filtre population minimale
     df_temp = df_clean[df_clean['population'] > min_pop].copy()
