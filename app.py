@@ -80,7 +80,7 @@ def rayon_max_isochrone(polygone_iso, centre):
 # ======================= API HERE
 @st.cache_data
 def get_here_isochrone(lat, lon, minutes, api_key):
-    # Doc: https://developer.here.com/documentation/routing-api/dev_guide/topics/use-cases/isoline.html
+    print(f"Appel HERE API: {lat}, {lon}, {minutes} min")
     url = (
         "https://isoline.route.ls.hereapi.com/routing/7.2/calculateisoline.json?"
         f"apiKey={api_key}"
