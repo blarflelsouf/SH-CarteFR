@@ -193,7 +193,7 @@ mode_recherche = st.sidebar.radio(
 if mode_recherche == "Rayon (km)":
     rayon = st.sidebar.slider("Rayon de recherche (km)", 10, 400, 200)
 else:
-    temps_min = st.sidebar.slider("Temps de trajet (minutes)", 5, 240, 60)  # Limite HERE : 4h
+    temps_min = st.sidebar.slider("Temps de trajet (minutes)", 5, 120, 60)  # Limite HERE : 4h
 
 min_pop = st.sidebar.number_input("Population minimale", min_value=0, value=10000)
 n = st.sidebar.number_input("Nombre d'agglomérations à afficher", min_value=1, max_value=30, value=10)
