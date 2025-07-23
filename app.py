@@ -206,10 +206,7 @@ def test_debug(x):
 st.title("Test debug print")
 val = st.number_input("Valeur", 1, 100, 10)
 result = test_debug(val)
-st.write(result)@st.cache_data
-def test_print(x):
-    print("CALL API", x)
-    return x*2
+st.write(result)
 
 x = st.number_input("Valeur", 1, 100)
 y = test_print(x)
