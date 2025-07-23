@@ -381,13 +381,15 @@ if adresse:
     st.sidebar.markdown("#### Légende des marqueurs")
     if mode_recherche == "Rayon (km)":
         st.sidebar.markdown("""
-        <span style='background-color:green;...'></span> <b>&lt; 50 km</b><br>
-        <span style='background-color:orange;...'></span> <b>&lt; 120 km</b><br>
-        <span style='background-color:red;...'></span> <b>&gt; 120 km</b>
-        """, unsafe_allow_html=True)
+        <span style='display:inline-block; width:16px; height:16px; background-color:purple; border-radius:50%; margin-right:8px;'></span> <b>Départ</b><br>
+        <span style='display:inline-block; width:16px; height:16px; background-color:green; border-radius:50%; margin-right:8px;'></span> <b>&lt; 50 km</b><br>
+        <span style='display:inline-block; width:16px; height:16px; background-color:orange; border-radius:50%; margin-right:8px;'></span> <b>&lt; 120 km</b><br>
+        <span style='display:inline-block; width:16px; height:16px; background-color:red; border-radius:50%; margin-right:8px;'></span> <b>&gt; 120 km</b>
+    """, unsafe_allow_html=True)
     else:
         st.sidebar.markdown("""
-        <span style='background-color:green;...'></span> <b>&lt; 30 min</b><br>
-        <span style='background-color:orange;...'></span> <b>&lt; 80 min</b><br>
-        <span style='background-color:red;...'></span> <b>&gt; 80 min</b>
-        """, unsafe_allow_html=True)
+        <span style='display:inline-block; width:16px; height:16px; background-color:purple; border-radius:50%; margin-right:8px;'></span> <b>Départ</b><br>
+        <span style='display:inline-block; width:16px; height:16px; background-color:green; border-radius:50%; margin-right:8px;'></span> <b>&lt; 30 mins</b><br>
+        <span style='display:inline-block; width:16px; height:16px; background-color:orange; border-radius:50%; margin-right:8px;'></span> <b>&lt; 80 mins</b><br>
+        <span style='display:inline-block; width:16px; height:16px; background-color:red; border-radius:50%; margin-right:8px;'></span> <b>&gt; 120 mins</b>
+    """, unsafe_allow_html=True)
