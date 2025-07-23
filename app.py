@@ -77,22 +77,33 @@ def rayon_max_isochrone(polygone_iso, centre):
             max_dist = d
     return max_dist
 
+# ======================= API HERE
+@st.cache_data(show_spinner="Construction de la zone de recherche (API HERE)…")
 def get_here_isochrone(lat, lon, minutes, api_key):
+    # Doc: https://developer.here.com/documentation/routing-api/dev_guide/topics/use-cases/isoline.html
     url = (
         "https://isoline.route.ls.hereapi.com/routing/7.2/calculateisoline.json?"
         f"apiKey={api_key}"
         f"&mode=fastest;car;traffic:disabled"
         f"&start=geo!{lat},{lon}"
         f"&rangeType=time"
-        f"&range={int(minutes)*60}"
+        f"&range={int(minutes)*60}"  # secondes
     )
     response = requests.get(url)
+    if response.status_code == 429:
+        st.error("⚠️ Vous avez dépassé la limite d'utilisation de l'API HERE. Réessayez dans quelques minutes ou consultez votre quota sur https://developer.here.com.")
+        st.stop()
     response.raise_for_status()
     data = response.json()
-    shape_coords = data['response']['isoline'][0]['component'][0]['shape']
-    coords = [tuple(map(float, s.split(','))) for s in shape_coords]
-    coords = [(lon, lat) for lat, lon in coords]
-    return Polygon(coords)
+    try:
+        shape_coords = data['response']['isoline'][0]['component'][0]['shape']
+        coords = [tuple(map(float, s.split(','))) for s in shape_coords]
+        # Ici, Here renvoie des tuples (lat, lon), alors que Shapely attend (lon, lat)
+        coords = [(lon, lat) for lat, lon in coords]
+        return Polygon(coords)
+    except Exception as e:
+        st.error("Impossible de générer la zone de recherche depuis l’API HERE. Détail : " + str(e))
+        st.stop()
 
 @st.cache_data
 def villes_dans_rayon_km(df_clean, coord_depart, rayon):
