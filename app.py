@@ -36,7 +36,6 @@ def load_data():
     df_clean = df.loc[:, ['nom_standard', 'reg_nom', 'population', 'latitude_mairie', 'longitude_mairie']]
     return df_clean
 
-# Fonction couleur marker
 def couleur_par_distance(distance):
     try:
         if distance is None:
@@ -50,7 +49,19 @@ def couleur_par_distance(distance):
     except:
         return "gray"
 
-# Géocodage adresse
+def couleur_par_trajet(temps):
+    try:
+        if temps is None:
+            return "gray"
+        if temps < 30:
+            return 'green'
+        elif temps < 80:
+            return 'orange'
+        else:
+            return 'red'
+    except:
+        return "gray"
+
 def geocode_adresse(adresse):
     geocoder = OpenCageGeocode(OC_API_KEY)
     try:
@@ -68,9 +79,7 @@ def geocode_adresse(adresse):
         st.error(f"Erreur géocodage OpenCage : {e}")
         st.stop()
 
-# Calcul radius max polygone
 def rayon_max_isochrone(polygone_iso, centre):
-    # Polygone isochrone (Shapely) et centre (lat, lon)
     points = list(polygone_iso.exterior.coords)
     max_dist = 0
     for lon, lat in points:
@@ -79,7 +88,6 @@ def rayon_max_isochrone(polygone_iso, centre):
             max_dist = d
     return max_dist
 
-# ---------- VILLES DANS RAYON ----------
 @st.cache_data
 def villes_dans_rayon_km(df_clean, coord_depart, rayon):
     df_all_in_radius = df_clean.copy()
@@ -87,8 +95,16 @@ def villes_dans_rayon_km(df_clean, coord_depart, rayon):
         lambda row: geodesic(coord_depart, (row['latitude_mairie'], row['longitude_mairie'])).km, axis=1)
     return df_all_in_radius[df_all_in_radius['distance_km'] <= rayon].reset_index(drop=True)
 
+def villes_dans_isochrone(df_candidates, polygone_isochrone):
+    df_all_in_iso = df_candidates.copy()
+    df_all_in_iso['in_isochrone'] = df_all_in_iso.apply(
+        lambda row: polygone_isochrone.contains(Point(row['longitude_mairie'], row['latitude_mairie'])),
+        axis=1
+    )
+    df_all_in_iso = df_all_in_iso[df_all_in_iso['in_isochrone']].reset_index(drop=True)
+    df_all_in_iso['distance_km'] = None
+    return df_all_in_iso
 
-# ---------- Grandes villes ----------
 @st.cache_data
 def gd_villes_dans_rayon_km(df_clean, coord_depart, rayon, min_pop, n):
     df_temp = df_clean[df_clean['population'] > min_pop].copy()
@@ -107,7 +123,6 @@ def gd_villes_dans_isochrone(df_clean, min_pop, n, polygone_isochrone):
     df_temp['distance_km'] = None
     return _agglos(df_temp, n, mode="isochrone")
 
-# --------- AGGLOMERATION GROUPING FUNCTION ---------
 def _agglos(df_temp, n, mode="km"):
     N = len(df_temp)
     if N == 0:
@@ -148,16 +163,21 @@ def _agglos(df_temp, n, mode="km"):
 
     agglo = agglo.sort_values('Population', ascending=False).head(n).reset_index(drop=True)
     return agglo
-    
-def villes_dans_isochrone(df_candidates, polygone_isochrone):
-    df_all_in_iso = df_candidates.copy()
-    df_all_in_iso['in_isochrone'] = df_all_in_iso.apply(
-        lambda row: polygone_isochrone.contains(Point(row['longitude_mairie'], row['latitude_mairie'])),
-        axis=1
-    )
-    df_all_in_iso = df_all_in_iso[df_all_in_iso['in_isochrone']].reset_index(drop=True)
-    df_all_in_iso['distance_km'] = None
-    return df_all_in_iso
+
+def get_travel_time_batch(ors_client, start_coord, villes_df):
+    times = []
+    for _, row in villes_df.iterrows():
+        try:
+            route = ors_client.directions(
+                coordinates=[[start_coord[1], start_coord[0]], [row['Longitude'], row['Latitude']]],
+                profile='driving-car',
+                format='geojson'
+            )
+            duration = route['features'][0]['properties']['summary']['duration']
+            times.append(duration / 60)  # en minutes
+        except Exception as e:
+            times.append(None)
+    return times
 
 # =======================
 # INTERFACE STREAMLIT
@@ -178,7 +198,6 @@ else:
 min_pop = st.sidebar.number_input("Population minimale", min_value=0, value=10000)
 n = st.sidebar.number_input("Nombre d'agglomérations à afficher", min_value=1, max_value=30, value=10)
 
-# Recherche seulement si adresse saisie
 if adresse:
     lat, lon, REGION, country = geocode_adresse(adresse)
     if lat is None:
@@ -190,7 +209,6 @@ if adresse:
     coord_depart = (lat, lon)
     coord_depart_lonlat = (lon, lat)
 
-    # --- Calcul du polygone de recherche si mode isochrone ---
     polygone_recherche = None
     if mode_recherche == "Rayon (km)":
         df_all_in_radius = villes_dans_rayon_km(df_clean, coord_depart, rayon)
@@ -208,6 +226,8 @@ if adresse:
         villes_candidates = villes_dans_rayon_km(df_clean, coord_depart, dmax + 5)
         df_all_in_radius = villes_dans_isochrone(villes_candidates, polygone_recherche)
         df_filtre = gd_villes_dans_isochrone(villes_candidates, min_pop, n, polygone_recherche)
+        # Calculer temps de trajet réel pour les N agglos trouvées
+        df_filtre['Temps (min)'] = get_travel_time_batch(ors_client, coord_depart, df_filtre)
 
     nombre_total_villes = len(df_all_in_radius)
     population_totale = int(df_all_in_radius['population'].sum())
@@ -245,6 +265,7 @@ if adresse:
             },
             name="Isochrone"
         ).add_to(m)
+
     # Heatmap (optionnelle)
     heatmap_pop = st.sidebar.checkbox("Afficher le mode heatmap")
     heat_data_pop = [
@@ -290,36 +311,56 @@ if adresse:
         icon=custom_icon
     ).add_to(m)
 
-    # Markers villes/agglos principales
-    for _, row in df_filtre.iterrows():
-        couleur = couleur_par_distance(row['Distance (en km)'])
+    # Marqueurs principales
+    for idx, row in df_filtre.iterrows():
+        if mode_recherche == "Rayon (km)":
+            couleur = couleur_par_distance(row['Distance (en km)'])
+            popup_info = f"{row['Ville']} ({row['Distance (en km)']} km, {row['Population']} hab)"
+        else:
+            temps = row['Temps (min)']
+            couleur = couleur_par_trajet(temps)
+            popup_info = f"{row['Ville']} ({temps:.0f} min, {row['Population']} hab)" if temps is not None else f"{row['Ville']} (- min, {row['Population']} hab)"
         folium.Marker(
             location=[row['Latitude'], row['Longitude']],
-            popup=f"{row['Ville']} ({row['Distance (en km)'] if row['Distance (en km)'] is not None else '-'} km, {row['Population']} hab)",
+            popup=popup_info,
             icon=folium.Icon(color=couleur)
         ).add_to(m)
 
     st.markdown(f"### Carte des {len(df_filtre)} plus grandes agglomérations autour de {adresse}")
     st_data = st_folium(m, width=900, height=600)
 
-    # Tableau HTML coloré
-    df_display = df_filtre[['Ville', 'Distance (en km)', 'Population', 'Région']].copy()
-    df_display["Distance (en km)"] = df_display["Distance (en km)"].apply(lambda x: f"{x:.2f}".replace(".", ",") if x is not None else "-")
-    df_display["Population"] = df_display["Population"].apply(lambda x: f"{int(x):,}".replace(",", "."))
+    # --- Tableau HTML coloré ---
+    if mode_recherche == "Rayon (km)":
+        df_display = df_filtre[['Ville', 'Distance (en km)', 'Population', 'Région']].copy()
+        df_display["Distance (en km)"] = df_display["Distance (en km)"].apply(lambda x: f"{x:.2f}".replace(".", ",") if x is not None else "-")
+        df_display["Population"] = df_display["Population"].apply(lambda x: f"{int(x):,}".replace(",", "."))
+    else:
+        df_display = df_filtre[['Ville', 'Temps (min)', 'Population', 'Région']].copy()
+        df_display["Temps (min)"] = df_display["Temps (min)"].apply(lambda x: f"{x:.0f}" if x is not None else "-")
+        df_display["Population"] = df_display["Population"].apply(lambda x: f"{int(x):,}".replace(",", "."))
+
     rows = []
     for _, row in df_display.iterrows():
-        try:
-            couleur = couleur_par_distance(float(row["Distance (en km)"].replace(",", "."))) if row["Distance (en km)"] != "-" else "gray"
-        except:
-            couleur = "gray"
-        ville_html = f'<span style="color:{couleur}; font-weight:bold">{row["Ville"]}</span>'
-        rows.append(f"<tr><td>{ville_html}</td><td>{row['Distance (en km)']} km</td><td>{row['Population']}</td><td>{row['Région']}</td></tr>")
+        if mode_recherche == "Rayon (km)":
+            try:
+                couleur = couleur_par_distance(float(row["Distance (en km)"].replace(",", "."))) if row["Distance (en km)"] != "-" else "gray"
+            except:
+                couleur = "gray"
+            ville_html = f'<span style="color:{couleur}; font-weight:bold">{row["Ville"]}</span>'
+            rows.append(f"<tr><td>{ville_html}</td><td>{row['Distance (en km)']} km</td><td>{row['Population']}</td><td>{row['Région']}</td></tr>")
+        else:
+            try:
+                couleur = couleur_par_trajet(float(row["Temps (min)"])) if row["Temps (min)"] != "-" else "gray"
+            except:
+                couleur = "gray"
+            ville_html = f'<span style="color:{couleur}; font-weight:bold">{row["Ville"]}</span>'
+            rows.append(f"<tr><td>{ville_html}</td><td>{row['Temps (min)']} min</td><td>{row['Population']}</td><td>{row['Région']}</td></tr>")
     table_html = f"""
     <table style="width:100%; border-collapse:collapse; font-size: 1.08em;">
     <thead>
     <tr style="background-color:#223366; color:white;">
         <th style="padding:8px; border:1px solid #AAA;">Ville</th>
-        <th style="padding:8px; border:1px solid #AAA;">Distance (en km)</th>
+        <th style="padding:8px; border:1px solid #AAA;">{"Distance (en km)" if mode_recherche == "Rayon (km)" else "Temps (en min)"}</th>
         <th style="padding:8px; border:1px solid #AAA;">Population</th>
         <th style="padding:8px; border:1px solid #AAA;">Région</th>
     </tr>
@@ -331,16 +372,22 @@ if adresse:
     """
     st.markdown(table_html, unsafe_allow_html=True)
 
-    # Tableau synthèse sous le HTML
+    # Tableau synthèse
     st.markdown("#### Synthèse dans le périmètre (toutes villes confondues)")
     st.dataframe(df_stats, hide_index=True)
 
-    # Légende
+    # Légende adaptée
     st.sidebar.markdown("---")
     st.sidebar.markdown("#### Légende des marqueurs")
-    st.sidebar.markdown("""
-    <span style='display:inline-block; width:16px; height:16px; background-color:purple; border-radius:50%; margin-right:8px;'></span> <b>Départ (violet)</b><br>
-    <span style='display:inline-block; width:16px; height:16px; background-color:green; border-radius:50%; margin-right:8px;'></span> <b>&lt; 50 km</b><br>
-    <span style='display:inline-block; width:16px; height:16px; background-color:orange; border-radius:50%; margin-right:8px;'></span> <b>&lt; 120 km</b><br>
-    <span style='display:inline-block; width:16px; height:16px; background-color:red; border-radius:50%; margin-right:8px;'></span> <b>&gt; 120 km</b>
-    """, unsafe_allow_html=True)
+    if mode_recherche == "Rayon (km)":
+        st.sidebar.markdown("""
+        <span style='background-color:green;...'></span> <b>&lt; 50 km</b><br>
+        <span style='background-color:orange;...'></span> <b>&lt; 120 km</b><br>
+        <span style='background-color:red;...'></span> <b>&gt; 120 km</b>
+        """, unsafe_allow_html=True)
+    else:
+        st.sidebar.markdown("""
+        <span style='background-color:green;...'></span> <b>&lt; 30 min</b><br>
+        <span style='background-color:orange;...'></span> <b>&lt; 80 min</b><br>
+        <span style='background-color:red;...'></span> <b>&gt; 80 min</b>
+        """, unsafe_allow_html=True)
