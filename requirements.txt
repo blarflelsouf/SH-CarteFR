@@ -6,3 +6,5 @@ pandas
 requests
 geopy
 numpy
+openrouteservice
+shapely
