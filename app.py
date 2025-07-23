@@ -68,6 +68,17 @@ def geocode_adresse(adresse):
         st.error(f"Erreur géocodage OpenCage : {e}")
         st.stop()
 
+# Calcul radius max polygone
+def rayon_max_isochrone(polygone_iso, centre):
+    # Polygone isochrone (Shapely) et centre (lat, lon)
+    points = list(polygone_iso.exterior.coords)
+    max_dist = 0
+    for lon, lat in points:
+        d = geodesic(centre, (lat, lon)).km
+        if d > max_dist:
+            max_dist = d
+    return max_dist
+
 # ---------- VILLES DANS RAYON ----------
 @st.cache_data
 def villes_dans_rayon_km(df_clean, coord_depart, rayon):
@@ -76,17 +87,7 @@ def villes_dans_rayon_km(df_clean, coord_depart, rayon):
         lambda row: geodesic(coord_depart, (row['latitude_mairie'], row['longitude_mairie'])).km, axis=1)
     return df_all_in_radius[df_all_in_radius['distance_km'] <= rayon].reset_index(drop=True)
 
-def villes_dans_isochrone(df_clean, polygone_isochrone):
-    df_all_in_iso = df_clean.copy()
-    df_all_in_iso['in_isochrone'] = df_all_in_iso.apply(
-        lambda row: polygone_isochrone.contains(Point(row['longitude_mairie'], row['latitude_mairie'])),
-        axis=1
-    )
-    df_all_in_iso = df_all_in_iso[df_all_in_iso['in_isochrone']].reset_index(drop=True)
-    df_all_in_iso['distance_km'] = None
-    return df_all_in_iso
-
-# ---------- AGGLOMERATIONS ----------
+# ---------- Grandes villes ----------
 @st.cache_data
 def gd_villes_dans_rayon_km(df_clean, coord_depart, rayon, min_pop, n):
     df_temp = df_clean[df_clean['population'] > min_pop].copy()
@@ -193,8 +194,10 @@ if adresse:
             units='m'
         )
         polygone_recherche = shape(iso['features'][0]['geometry'])
-        df_all_in_radius = villes_dans_isochrone(df_clean, polygone_recherche)
-        df_filtre = gd_villes_dans_isochrone(df_clean, min_pop, n, polygone_recherche)
+        dmax = rayon_max_isochrone(polygone_recherche, coord_depart)
+        villes_candidates = villes_dans_rayon_km(df_clean, coord_depart, dmax + 5)
+        df_all_in_radius = villes_dans_isochrone(villes_candidates, polygone_recherche)
+        df_filtre = gd_villes_dans_isochrone(villes_candidates, min_pop, n, polygone_recherche)
 
     nombre_total_villes = len(df_all_in_radius)
     population_totale = int(df_all_in_radius['population'].sum())
