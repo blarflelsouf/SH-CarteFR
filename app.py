@@ -46,24 +46,23 @@ def load_data():
 
 # Calcul des villes dans le rayon sans critère de population (totaux synthèse)
 @st.cache_data
-def villes_dans_rayon(df_clean, coord_depart, rayon, mode_recherche):
+def villes_dans_rayon(df_clean, coord_depart, rayon, mode_recherche, polygone_isochrone=None):
+    df_all_in_radius = df_clean.copy()
     if mode_recherche == "Rayon (km)":
-        df_all_in_radius = df_clean.copy()
         df_all_in_radius['distance_km'] = df_all_in_radius.apply(
             lambda row: geodesic(coord_depart, (row['latitude_mairie'], row['longitude_mairie'])).km, axis=1)
-        df_all_in_radius = df_all_in_radius[df_all_in_radius['distance_km'] <= rayon]
-
+        df_all_in_radius = df_all_in_radius[df_all_in_radius['distance_km'] <= rayon].reset_index(drop=True)
     else:
-        df_all_in_radius = df_clean.copy()
+        from shapely.geometry import Point
+        # On ne garde que les villes dont la mairie est dans le polygone isochrone
         df_all_in_radius['in_isochrone'] = df_all_in_radius.apply(
-            lambda row: polygone_recherche.contains(Point(row['longitude_mairie'], row['latitude_mairie'])),
+            lambda row: polygone_isochrone.contains(Point(row['longitude_mairie'], row['latitude_mairie'])),
             axis=1
         )
         df_all_in_radius = df_all_in_radius[df_all_in_radius['in_isochrone']].reset_index(drop=True)
-        # Pour compatibilité suite, simule une "distance_km" fictive (ou affiche "NaN" ou le rang du point)
-        df_all_in_radius['distance_km'] = None
-        
+        df_all_in_radius['distance_km'] = None  # Pas de distance dans ce mode
     return df_all_in_radius
+
 
 # Calcul des agglomérations de grandes villes (regroupement spatial <15 km)
 @st.cache_data
@@ -194,13 +193,23 @@ if adresse:
     coord_depart_lonlat = (lon, lat)
     
     # Calcul des totaux dans le rayon en km
-    df_all_in_radius = villes_dans_rayon(df_clean, coord_depart, rayon, mode_recherche)
+    if mode_recherche == "Rayon (km)":
+        df_all_in_radius = villes_dans_rayon(df_clean, coord_depart, rayon, mode_recherche)
+    else:
+        rayon_min = 
+        df_all_in_radius = villes_dans_rayon(df_clean, coord_depart, rayon, mode_recherche, polygone_isochrone=polygone_recherche)
+
+    
     nombre_total_villes = len(df_all_in_radius)
     population_totale = int(df_all_in_radius['population'].sum())
     population_totale_str = f"{population_totale:,}".replace(",", ".")
     
     # Calcul grandes villes/agglos (filtre pop, groupement spatial)
-    df_filtre = gd_villes_dans_rayon(df_clean, coord_depart, rayon, min_pop, n, mode_recherche, polygone_isochrone)
+    if mode_recherche == "Rayon (km)":
+        df_filtre = gd_villes_dans_rayon(df_clean, coord_depart, rayon, min_pop, n, mode_recherche)
+    else:
+        df_filtre = gd_villes_dans_rayon(df_clean, coord_depart, rayon=None, min_pop=min_pop, n=n, mode_recherche=mode_recherche, polygone_isochrone=polygone_recherche)
+
     if df_filtre.empty:
         st.warning("Aucune agglomération trouvée dans le rayon et avec la population minimale sélectionnée.")
         st.stop()
