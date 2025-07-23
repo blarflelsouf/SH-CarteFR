@@ -78,7 +78,7 @@ def rayon_max_isochrone(polygone_iso, centre):
     return max_dist
 
 # ======================= API HERE
-@st.cache_data(show_spinner="Construction de la zone de recherche (API HERE)…")
+@st.cache_data
 def get_here_isochrone(lat, lon, minutes, api_key):
     # Doc: https://developer.here.com/documentation/routing-api/dev_guide/topics/use-cases/isoline.html
     url = (
