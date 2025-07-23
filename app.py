@@ -193,22 +193,15 @@ if adresse:
     coord_depart_lonlat = (lon, lat)
     
     # Calcul des totaux dans le rayon en km
-    if mode_recherche == "Rayon (km)":
-        df_all_in_radius = villes_dans_rayon(df_clean, coord_depart, rayon, mode_recherche)
-    else:
-        df_all_in_radius = villes_dans_rayon(df_clean, coord_depart, rayon, mode_recherche, polygone_isochrone=polygone_recherche)
-
+   df_all_in_radius = villes_dans_rayon(df_clean, coord_depart, rayon if mode_recherche=="Rayon (km)" else None, mode_recherche, polygone_isochrone=polygone_recherche)
     
     nombre_total_villes = len(df_all_in_radius)
     population_totale = int(df_all_in_radius['population'].sum())
     population_totale_str = f"{population_totale:,}".replace(",", ".")
     
     # Calcul grandes villes/agglos (filtre pop, groupement spatial)
-    if mode_recherche == "Rayon (km)":
-        df_filtre = gd_villes_dans_rayon(df_clean, coord_depart, rayon, min_pop, n, mode_recherche)
-    else:
-        df_filtre = gd_villes_dans_rayon(df_clean, coord_depart, rayon=None, min_pop=min_pop, n=n, mode_recherche=mode_recherche, polygone_isochrone=polygone_recherche)
-
+    df_filtre = gd_villes_dans_rayon(df_clean, coord_depart, rayon if mode_recherche=="Rayon (km)" else None, min_pop, n, mode_recherche, polygone_isochrone=polygone_recherche)
+    
     if df_filtre.empty:
         st.warning("Aucune agglomération trouvée dans le rayon et avec la population minimale sélectionnée.")
         st.stop()
@@ -220,9 +213,9 @@ if adresse:
     })
 
     #Calcul temps de trajet
+    polygone_recherche = None
     if mode_recherche == "Rayon (km)":
-        # Cercle classique
-        polygone_recherche = None  # On l'affichera plus bas
+        pass  # polygone inutile
     else:
         iso = ors_client.isochrones(
             locations=[coord_depart_lonlat],
@@ -231,14 +224,7 @@ if adresse:
             intervals=[temps_min * 60],
             units='m'
         )
-        iso_shape = shape(iso['features'][0]['geometry'])
-    
-    # Filtre les villes dont la mairie est dans le polygone isochrone
-    df_clean['in_isochrone'] = df_clean.apply(
-        lambda row: iso_shape.contains(Point(row['longitude_mairie'], row['latitude_mairie'])),
-        axis=1
-    )
-    df_in_isochrone = df_clean[df_clean['in_isochrone']]
+        polygone_recherche = shape(iso['features'][0]['geometry'])
     
     # Affichage de la carte Folium
     m = folium.Map(location=coord_depart, zoom_start=8)
