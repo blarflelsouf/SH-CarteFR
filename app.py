@@ -216,14 +216,14 @@ if adresse:
         # Cercle classique
         polygone_recherche = None  # On l'affichera plus bas
     else:
-    iso = ors_client.isochrones(
-        locations=[coord_depart_lonlat],
-        profile='driving-car',
-        range=[temps_min * 60],
-        intervals=[temps_min * 60],
-        units='m'
-    )
-    iso_shape = shape(iso['features'][0]['geometry'])
+        iso = ors_client.isochrones(
+            locations=[coord_depart_lonlat],
+            profile='driving-car',
+            range=[temps_min * 60],
+            intervals=[temps_min * 60],
+            units='m'
+        )
+        iso_shape = shape(iso['features'][0]['geometry'])
     
     # Filtre les villes dont la mairie est dans le polygone isochrone
     df_clean['in_isochrone'] = df_clean.apply(
