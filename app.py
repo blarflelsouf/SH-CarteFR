@@ -97,7 +97,6 @@ def gd_villes_dans_rayon_km(df_clean, coord_depart, rayon, min_pop, n):
     return _agglos(df_temp, n, mode="km")
 
 def gd_villes_dans_isochrone(df_clean, min_pop, n, polygone_isochrone):
-    from shapely.geometry import Point
     df_temp = df_clean[df_clean['population'] > min_pop].copy()
     df_temp['in_isochrone'] = df_temp.apply(
         lambda row: polygone_isochrone.contains(Point(row['longitude_mairie'], row['latitude_mairie'])),
