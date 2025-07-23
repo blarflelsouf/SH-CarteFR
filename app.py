@@ -196,7 +196,6 @@ if adresse:
     if mode_recherche == "Rayon (km)":
         df_all_in_radius = villes_dans_rayon(df_clean, coord_depart, rayon, mode_recherche)
     else:
-        rayon_min = 
         df_all_in_radius = villes_dans_rayon(df_clean, coord_depart, rayon, mode_recherche, polygone_isochrone=polygone_recherche)
 
     
