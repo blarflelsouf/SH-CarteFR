@@ -9,13 +9,17 @@ import requests
 import urllib.request
 import os
 import numpy as np
+import openrouteservice
+from shapely.geometry import shape, Point
 
 # =======================
 # CONFIGURATION & DATA
 # =======================
 
-# Récupération clé API OpenCage (gérée dans les secrets Streamlit Cloud)
+# Récupération clé API OpenCage et OpenRouteService (gérée dans les secrets Streamlit Cloud)
 OC_API_KEY = st.secrets["OPENCAGE_API_KEY"]
+ORS_API_KEY = st.secrets["ORS_API_KEY"]
+ors_client = openrouteservice.Client(key=ORS_API_KEY)
 
 # 1. Téléchargement du fichier CSV communes (si absent en local)
 def telecharger_csv_si_absent(fichier, url):
@@ -42,30 +46,51 @@ def load_data():
 
 # Calcul des villes dans le rayon sans critère de population (totaux synthèse)
 @st.cache_data
-def villes_dans_rayon(df_clean, coord_depart, rayon):
-    df_all_in_radius = df_clean.copy()
-    df_all_in_radius['distance_km'] = df_all_in_radius.apply(
-        lambda row: geodesic(coord_depart, (row['latitude_mairie'], row['longitude_mairie'])).km, axis=1)
-    df_all_in_radius = df_all_in_radius[df_all_in_radius['distance_km'] <= rayon]
+def villes_dans_rayon(df_clean, coord_depart, rayon, mode_recherche):
+    if mode_recherche == "Rayon (km)":
+        df_all_in_radius = df_clean.copy()
+        df_all_in_radius['distance_km'] = df_all_in_radius.apply(
+            lambda row: geodesic(coord_depart, (row['latitude_mairie'], row['longitude_mairie'])).km, axis=1)
+        df_all_in_radius = df_all_in_radius[df_all_in_radius['distance_km'] <= rayon]
+
+    else:
+        df_all_in_radius = df_clean.copy()
+        df_all_in_radius['in_isochrone'] = df_all_in_radius.apply(
+            lambda row: polygone_recherche.contains(Point(row['longitude_mairie'], row['latitude_mairie'])),
+            axis=1
+        )
+        df_all_in_radius = df_all_in_radius[df_all_in_radius['in_isochrone']].reset_index(drop=True)
+        # Pour compatibilité suite, simule une "distance_km" fictive (ou affiche "NaN" ou le rang du point)
+        df_all_in_radius['distance_km'] = None
+        
     return df_all_in_radius
 
 # Calcul des agglomérations de grandes villes (regroupement spatial <15 km)
 @st.cache_data
-def gd_villes_dans_rayon(df_clean, coord_depart, rayon, min_pop, n):
-    # Filtre population
+def gd_villes_dans_rayon(df_clean, coord_depart, rayon, min_pop, n, mode_recherche, polygone_isochrone=None):
+    # Filtre population minimale
     df_temp = df_clean[df_clean['population'] > min_pop].copy()
-    
-    # Calcul de la distance à l'adresse de départ
-    df_temp['distance_km'] = df_temp.apply(
-        lambda row: geodesic(coord_depart, (row['latitude_mairie'], row['longitude_mairie'])).km, axis=1)
-    
-    # On garde les villes dans le cercle
-    df_temp = df_temp[df_temp['distance_km'] <= rayon].reset_index(drop=True)
+
+    if mode_recherche == "Rayon (km)":
+        # Distance à vol d'oiseau
+        df_temp['distance_km'] = df_temp.apply(
+            lambda row: geodesic(coord_depart, (row['latitude_mairie'], row['longitude_mairie'])).km, axis=1)
+        # On garde les villes dans le cercle
+        df_temp = df_temp[df_temp['distance_km'] <= rayon].reset_index(drop=True)
+    else:
+        df_temp['in_isochrone'] = df_temp.apply(
+            lambda row: polygone_isochrone.contains(Point(row['longitude_mairie'], row['latitude_mairie'])),
+            axis=1
+        )
+        df_temp = df_temp[df_temp['in_isochrone']].reset_index(drop=True)
+        # Pour compatibilité, on peut créer une "distance fictive" (ou None)
+        df_temp['distance_km'] = None
+
     N = len(df_temp)
     if N == 0:
         return pd.DataFrame()
-        
-    # Algorithme "maison" de clustering spatial (agglomération = groupe de villes à <15 km)
+
+    # --- Regroupement agglomérations (par proximité) ---
     group_ids = np.full(N, -1)
     current_group = 0
     for i in range(N):
@@ -80,28 +105,32 @@ def gd_villes_dans_rayon(df_clean, coord_depart, rayon, min_pop, n):
                 if group_ids[j] != -1:
                     continue
                 lat2, lon2 = df_temp.loc[j, ['latitude_mairie', 'longitude_mairie']]
+                # Même algo pour le groupement spatial, peu importe le mode
                 distance = geodesic((lat1, lon1), (lat2, lon2)).km
                 if distance < 15:
                     group_ids[j] = current_group
                     group_stack.append(j)
         current_group += 1
     df_temp['agglomeration'] = group_ids
-    # Pour chaque groupe : nom de la ville principale (plus grande pop), population totale, coordonnées, etc.
+
+    # Création du DataFrame d'agglomérations
     agglo = (
         df_temp.groupby('agglomeration')
         .apply(lambda g: pd.Series({
             'Ville': g.loc[g['population'].idxmax()]['nom_standard'],
             'Latitude': g.loc[g['population'].idxmax()]['latitude_mairie'],
             'Longitude': g.loc[g['population'].idxmax()]['longitude_mairie'],
-            'Distance (en km)': g.loc[g['population'].idxmax()]['distance_km'],
+            # Pour la distance : km si mode km, sinon None ou NaN (adaptation possible si tu calcules le temps réel)
+            'Distance (en km)': g.loc[g['population'].idxmax()]['distance_km'] if mode_recherche == "Rayon (km)" else None,
             'Population': int(g['population'].sum()),
             'Région': g['reg_nom'].mode()[0]
         }))
         .reset_index(drop=True)
     )
-    # On trie par population totale et on ne garde que les n plus grandes agglos
+
     agglo = agglo.sort_values('Population', ascending=False).head(n).reset_index(drop=True)
     return agglo
+
 
 # Fonction couleur selon la distance (pour la table & les markers)
 def couleur_par_distance(distance):
@@ -138,7 +167,14 @@ df_clean = load_data()
 st.title("Stanhome Regional Explorer")
 st.sidebar.title("Paramètres de la recherche")
 adresse = st.sidebar.text_input("Adresse de départ", value="Paris")
-rayon = st.sidebar.slider("Rayon de recherche (km)", 10, 400, 200)
+mode_recherche = st.sidebar.radio(
+    "Mode de recherche",
+    options=["Rayon (km)", "Temps de trajet (minutes)"]
+)
+if mode_recherche == "Rayon (km)":
+    rayon = st.sidebar.slider("Rayon de recherche (km)", 10, 400, 200)
+else:
+    temps_min = st.sidebar.slider("Temps de trajet (minutes)", 5, 120, 30)
 min_pop = st.sidebar.number_input("Population minimale", min_value=0, value=10000)
 n = st.sidebar.number_input("Nombre d'agglomérations à afficher", min_value=1, max_value=30, value=10)
 
@@ -155,15 +191,16 @@ if adresse:
         st.warning("Attention : l’adresse saisie n’est pas en France. Le radar ne fonctionne que pour la France.")
         st.stop()
     coord_depart = (lat, lon)
+    coord_depart_lonlat = (lon, lat)
     
-    # Calcul des totaux dans le rayon
-    df_all_in_radius = villes_dans_rayon(df_clean, coord_depart, rayon)
+    # Calcul des totaux dans le rayon en km
+    df_all_in_radius = villes_dans_rayon(df_clean, coord_depart, rayon, mode_recherche)
     nombre_total_villes = len(df_all_in_radius)
     population_totale = int(df_all_in_radius['population'].sum())
     population_totale_str = f"{population_totale:,}".replace(",", ".")
     
     # Calcul grandes villes/agglos (filtre pop, groupement spatial)
-    df_filtre = gd_villes_dans_rayon(df_clean, coord_depart, rayon, min_pop, n)
+    df_filtre = gd_villes_dans_rayon(df_clean, coord_depart, rayon, min_pop, n, mode_recherche, polygone_isochrone)
     if df_filtre.empty:
         st.warning("Aucune agglomération trouvée dans le rayon et avec la population minimale sélectionnée.")
         st.stop()
@@ -173,6 +210,27 @@ if adresse:
         "Indicateur": ["Nombre total de villes dans le rayon", "Population totale dans le rayon", "Population totale des grandes villes"],
         "Valeur": [nombre_total_villes, population_totale_str, population_totale_gd_ville_str]
     })
+
+    #Calcul temps de trajet
+    if mode_recherche == "Rayon (km)":
+        # Cercle classique
+        polygone_recherche = None  # On l'affichera plus bas
+    else:
+    iso = ors_client.isochrones(
+        locations=[coord_depart_lonlat],
+        profile='driving-car',
+        range=[temps_min * 60],
+        intervals=[temps_min * 60],
+        units='m'
+    )
+    iso_shape = shape(iso['features'][0]['geometry'])
+    
+    # Filtre les villes dont la mairie est dans le polygone isochrone
+    df_clean['in_isochrone'] = df_clean.apply(
+        lambda row: iso_shape.contains(Point(row['longitude_mairie'], row['latitude_mairie'])),
+        axis=1
+    )
+    df_in_isochrone = df_clean[df_clean['in_isochrone']]
     
     # Affichage de la carte Folium
     m = folium.Map(location=coord_depart, zoom_start=8)
@@ -189,7 +247,7 @@ if adresse:
         
     # Isochrone visuel
     isochrone_mode = st.sidebar.checkbox("Afficher le mode isochrone (rayon)")
-    if isochrone_mode:
+    if isochrone_mode and mode_recherche == "Rayon (km)":
         folium.Circle(
             radius=rayon * 1000,
             location=coord_depart,
@@ -199,6 +257,18 @@ if adresse:
             popup=f"{rayon} km autour de {adresse}"
         ).add_to(m)
         
+        if isochrone_mode and mode_recherche == "Temps de trajet (minutes)":
+            folium.GeoJson(
+            data=polygone_recherche,
+            style_function=lambda feature: {
+                'fillColor': 'purple',
+                'color': 'purple',
+                'weight': 2,
+                'fillOpacity': 0.15,
+            },
+            name="Isochrone"
+        ).add_to(m)
+            
     # Affichage région GeoJSON
     url_geojson = "https://france-geojson.gregoiredavid.fr/repo/regions.geojson"
     region_geojson_all = requests.get(url_geojson).json()
