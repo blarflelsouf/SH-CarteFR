@@ -208,6 +208,7 @@ if adresse:
         st.stop()
     coord_depart = (lat, lon)
     coord_depart_lonlat = (lon, lat)
+get_here_isochrone(lat, lon, temps_min, HERE_API_KEY)
 
     # === TRAITEMENT SELON MODE ===
     if mode_recherche == "Rayon (km)":
