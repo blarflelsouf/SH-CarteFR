@@ -198,19 +198,6 @@ else:
 min_pop = st.sidebar.number_input("Population minimale", min_value=0, value=10000)
 n = st.sidebar.number_input("Nombre d'agglomérations à afficher", min_value=1, max_value=30, value=10)
 
-@st.cache_data
-def test_debug(x):
-    print("DEBUG APPEL FONCTION", x)
-    return x * 2
-
-st.title("Test debug print")
-val = st.number_input("Valeur", 1, 100, 10)
-result = test_debug(val)
-st.write(result)
-
-x = st.number_input("Valeur", 1, 100)
-y = test_print(x)
-st.write("Résultat :", y)
 
 if adresse:
     lat, lon, REGION, country = geocode_adresse(adresse)
