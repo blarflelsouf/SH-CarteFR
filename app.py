@@ -87,15 +87,6 @@ def villes_dans_rayon_km(df_clean, coord_depart, rayon):
         lambda row: geodesic(coord_depart, (row['latitude_mairie'], row['longitude_mairie'])).km, axis=1)
     return df_all_in_radius[df_all_in_radius['distance_km'] <= rayon].reset_index(drop=True)
 
-def villes_dans_isochrone(df_candidates, polygone_isochrone):
-    df_all_in_iso = df_candidates.copy()
-    df_all_in_iso['in_isochrone'] = df_all_in_iso.apply(
-        lambda row: polygone_isochrone.contains(Point(row['longitude_mairie'], row['latitude_mairie'])),
-        axis=1
-    )
-    df_all_in_iso = df_all_in_iso[df_all_in_iso['in_isochrone']].reset_index(drop=True)
-    df_all_in_iso['distance_km'] = None
-    return df_all_in_iso
 
 # ---------- Grandes villes ----------
 @st.cache_data
@@ -157,6 +148,16 @@ def _agglos(df_temp, n, mode="km"):
 
     agglo = agglo.sort_values('Population', ascending=False).head(n).reset_index(drop=True)
     return agglo
+    
+def villes_dans_isochrone(df_candidates, polygone_isochrone):
+    df_all_in_iso = df_candidates.copy()
+    df_all_in_iso['in_isochrone'] = df_all_in_iso.apply(
+        lambda row: polygone_isochrone.contains(Point(row['longitude_mairie'], row['latitude_mairie'])),
+        axis=1
+    )
+    df_all_in_iso = df_all_in_iso[df_all_in_iso['in_isochrone']].reset_index(drop=True)
+    df_all_in_iso['distance_km'] = None
+    return df_all_in_iso
 
 # =======================
 # INTERFACE STREAMLIT
