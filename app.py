@@ -198,6 +198,15 @@ else:
 min_pop = st.sidebar.number_input("Population minimale", min_value=0, value=10000)
 n = st.sidebar.number_input("Nombre d'agglomérations à afficher", min_value=1, max_value=30, value=10)
 
+@st.cache_data
+def test_print(x):
+    print("CALL API", x)
+    return x*2
+
+x = st.number_input("Valeur", 1, 100)
+y = test_print(x)
+st.write("Résultat :", y)
+
 if adresse:
     lat, lon, REGION, country = geocode_adresse(adresse)
     if lat is None:
@@ -208,7 +217,7 @@ if adresse:
         st.stop()
     coord_depart = (lat, lon)
     coord_depart_lonlat = (lon, lat)
-    get_here_isochrone(lat, lon, 60, HERE_API_KEY)
+    
 
     # === TRAITEMENT SELON MODE ===
     if mode_recherche == "Rayon (km)":
