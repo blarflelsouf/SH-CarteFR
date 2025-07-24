@@ -164,11 +164,10 @@ def _agglos(df_temp, n, mode="km"):
 
 def find_villes_dans_temps(ors_client, start_coord, df_gds_villes_sup_60_min, obj_grande_villes, temps_min):
     """
-    Pour chaque ville candidate, on vérifie si elle est accessible en moins de temps_min en voiture.
-    On retourne jusqu'à obj_grande_villes villes éligibles, avec leur temps de trajet.
+    Pour chaque ville candidate, vérifie si elle est accessible en moins de temps_min en voiture.
+    Retourne jusqu'à obj_grande_villes villes éligibles, avec leur temps de trajet.
     """
     eligible_rows = []
-    nb_tested = 0
 
     for idx, row in df_gds_villes_sup_60_min.iterrows():
         dest_coord = [row['longitude_mairie'], row['latitude_mairie']]
@@ -179,20 +178,24 @@ def find_villes_dans_temps(ors_client, start_coord, df_gds_villes_sup_60_min, ob
                 format='geojson'
             )
             duration_min = route['features'][0]['properties']['summary']['duration'] / 60
-            nb_tested += 1
 
             if duration_min <= temps_min:
                 new_row = row.copy()
                 new_row['Temps (min)'] = duration_min
                 eligible_rows.append(new_row)
                 if len(eligible_rows) >= obj_grande_villes:
+                    break
+        except Exception as e:
+            # print(f"Erreur ORS pour {row['nom_standard']} : {e}")
+            continue
 
-    # On retourne un DataFrame
     if eligible_rows:
         df_eligible = pd.DataFrame(eligible_rows)
         return df_eligible
     else:
         return pd.DataFrame(columns=list(df_gds_villes_sup_60_min.columns) + ['Temps (min)'])
+
+
 
 
 def get_travel_time_batch(ors_client, start_coord, villes_df):
