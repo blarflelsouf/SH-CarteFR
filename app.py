@@ -248,7 +248,7 @@ if adresse:
         df_all_in_radius = villes_dans_rayon_km(df_clean, coord_depart, rayon)
         df_filtre = gd_villes_dans_rayon_km(df_all_in_radius, coord_depart, rayon, min_pop, n)
         
-    else mode_recherche == "Temps de trajet (minutes)":
+    else:
         iso = ors_client.isochrones(
             locations=[coord_depart_lonlat],
             profile='driving-car',
