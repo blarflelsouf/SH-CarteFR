@@ -162,6 +162,40 @@ def _agglos(df_temp, n, mode="km"):
     agglo = agglo.sort_values('Population', ascending=False).head(n).reset_index(drop=True)
     return agglo
 
+def find_villes_dans_temps(ors_client, start_coord, df_gds_villes_sup_60_min, obj_grande_villes, temps_min):
+    """
+    Pour chaque ville candidate, on vérifie si elle est accessible en moins de temps_min en voiture.
+    On retourne jusqu'à obj_grande_villes villes éligibles, avec leur temps de trajet.
+    """
+    eligible_rows = []
+    nb_tested = 0
+
+    for idx, row in df_gds_villes_sup_60_min.iterrows():
+        dest_coord = [row['longitude_mairie'], row['latitude_mairie']]
+        try:
+            route = ors_client.directions(
+                coordinates=[[start_coord[1], start_coord[0]], dest_coord],
+                profile='driving-car',
+                format='geojson'
+            )
+            duration_min = route['features'][0]['properties']['summary']['duration'] / 60
+            nb_tested += 1
+
+            if duration_min <= temps_min:
+                new_row = row.copy()
+                new_row['Temps (min)'] = duration_min
+                eligible_rows.append(new_row)
+                if len(eligible_rows) >= obj_grande_villes:
+                    break
+
+    # On retourne un DataFrame
+    if eligible_rows:
+        df_eligible = pd.DataFrame(eligible_rows)
+        return df_eligible
+    else:
+        return pd.DataFrame(columns=list(df_gds_villes_sup_60_min.columns) + ['Temps (min)'])
+
+
 def get_travel_time_batch(ors_client, start_coord, villes_df):
     times = []
     for _, row in villes_df.iterrows():
@@ -192,7 +226,7 @@ mode_recherche = st.sidebar.radio(
 if mode_recherche == "Rayon (km)":
     rayon = st.sidebar.slider("Rayon de recherche (km)", 10, 400, 200)
 else:
-    temps_min = st.sidebar.slider("Temps de trajet (minutes)", 5, 60, 30)
+    temps_min = st.sidebar.slider("Temps de trajet (minutes)", 5, 120, 60)
 min_pop = st.sidebar.number_input("Population minimale", min_value=0, value=10000)
 n = st.sidebar.number_input("Nombre d'agglomérations à afficher", min_value=1, max_value=30, value=10)
 
@@ -211,7 +245,8 @@ if adresse:
     if mode_recherche == "Rayon (km)":
         df_all_in_radius = villes_dans_rayon_km(df_clean, coord_depart, rayon)
         df_filtre = gd_villes_dans_rayon_km(df_all_in_radius, coord_depart, rayon, min_pop, n)
-    else:
+        
+    else mode_recherche == "Temps de trajet (minutes)":
         iso = ors_client.isochrones(
             locations=[coord_depart_lonlat],
             profile='driving-car',
@@ -223,9 +258,22 @@ if adresse:
         dmax = rayon_max_isochrone(polygone_recherche, coord_depart)
         villes_candidates = villes_dans_rayon_km(df_clean, coord_depart, dmax + 5)
         df_all_in_radius = villes_dans_isochrone(villes_candidates, polygone_recherche)
+        
         df_filtre = gd_villes_dans_isochrone(villes_candidates, min_pop, n, polygone_recherche)
-        # Calculer temps de trajet réel pour les N agglos trouvées
         df_filtre['Temps (min)'] = get_travel_time_batch(ors_client, coord_depart, df_filtre)
+
+        if temps_min > 61:
+            nbr_gds_villes_ss_60_mins = len(df_filtre)
+        obj_grande_villes = n - nbr_gds_villes_ss_60_mins
+        df_villes_sup_60_min = villes_dans_rayon_km(df_clean, coord_depart, 200)
+        df_villes_sup_60_min = df_villes_sup_60_min[df_villes_sup_60_min['population'] > min_pop].copy()
+        df_gds_villes_sup_60_min = df_villes_sup_60_min[~df_villes_sup_60_min['nom_standard'].isin(df_filtre['Ville'])]
+        df_sup_60 = find_villes_dans_temps(ors_client, coord_depart, df_gds_villes_sup_60_min, obj_grande_villes, temps_min)
+        if not df_sup_60.empty:
+            df_sup_60 = df_sup_60.rename(columns={'nom_standard': 'Ville', 'latitude_mairie': 'Latitude', 'longitude_mairie': 'Longitude'})
+            df_filtre = pd.concat([df_filtre, df_sup_60[['Ville', 'Latitude', 'Longitude', 'population', 'reg_nom', 'Temps (min)']]], ignore_index=True)
+
+        
 
     nombre_total_villes = len(df_all_in_radius)
     population_totale = int(df_all_in_radius['population'].sum())
