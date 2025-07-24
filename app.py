@@ -186,7 +186,6 @@ def find_villes_dans_temps(ors_client, start_coord, df_gds_villes_sup_60_min, ob
                 new_row['Temps (min)'] = duration_min
                 eligible_rows.append(new_row)
                 if len(eligible_rows) >= obj_grande_villes:
-                    break
 
     # On retourne un DataFrame
     if eligible_rows:
