@@ -133,6 +133,7 @@ def _agglos(df_temp, n, mode="km"):
         group_stack = [i]
         while group_stack:
             idx = group_stack.pop()
+            print(df_temp.loc[j, ['latitude_mairie', 'longitude_mairie']])
             lat1, lon1 = df_temp.loc[idx, ['latitude_mairie', 'longitude_mairie']]
             for j in range(N):
                 if group_ids[j] != -1:
