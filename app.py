@@ -335,10 +335,6 @@ if adresse:
             "Valeur": [nombre_total_villes, population_totale_str, population_totale_gd_ville_str]
         })
 
-    # Affichage synthèse
-    st.markdown("#### Synthèse dans le périmètre (toutes villes confondues)")
-    st.dataframe(df_stats, hide_index=True)
-
 
     # --- Affichage de la carte Folium ---
     m = folium.Map(location=coord_depart, zoom_start=8)
