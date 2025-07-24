@@ -108,9 +108,6 @@ def villes_dans_isochrone(df_candidates, polygone_isochrone):
 @st.cache_data
 def gd_villes_dans_rayon_km(df_clean, coord_depart, rayon, min_pop, n):
     df_temp = df_clean[df_clean['population'] > min_pop].copy()
-    df_temp['distance_km'] = df_temp.apply(
-        lambda row: geodesic(coord_depart, (row['latitude_mairie'], row['longitude_mairie'])).km, axis=1)
-    df_temp = df_temp[df_temp['distance_km'] <= rayon].reset_index(drop=True)
     return _agglos(df_temp, n, mode="km")
 
 def gd_villes_dans_isochrone(df_clean, min_pop, n, polygone_isochrone):
@@ -212,7 +209,7 @@ if adresse:
     polygone_recherche = None
     if mode_recherche == "Rayon (km)":
         df_all_in_radius = villes_dans_rayon_km(df_clean, coord_depart, rayon)
-        df_filtre = gd_villes_dans_rayon_km(df_clean, coord_depart, rayon, min_pop, n)
+        df_filtre = gd_villes_dans_rayon_km(df_all_in_radius, coord_depart, rayon, min_pop, n)
     else:
         iso = ors_client.isochrones(
             locations=[coord_depart_lonlat],
