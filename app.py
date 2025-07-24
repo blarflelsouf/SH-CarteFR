@@ -300,18 +300,45 @@ if adresse:
 
         
 
-    nombre_total_villes = len(df_all_in_radius)
-    population_totale = int(df_all_in_radius['population'].sum())
-    population_totale_str = f"{population_totale:,}".replace(",", ".")
-    if df_filtre.empty:
-        st.warning("Aucune agglomération trouvée dans le périmètre et avec la population minimale sélectionnée.")
-        st.stop()
-    population_totale_gd_ville = int(df_filtre['Population'].sum())
-    population_totale_gd_ville_str = f"{population_totale_gd_ville:,}".replace(",", ".")
-    df_stats = pd.DataFrame({
-        "Indicateur": ["Nombre total de villes dans le périmètre", "Population totale dans le périmètre", "Population totale des grandes villes"],
-        "Valeur": [nombre_total_villes, population_totale_str, population_totale_gd_ville_str]
-    })
+        # --- Tableau de synthèse adapté ---
+    if mode_recherche == "Temps de trajet (minutes)" and not df_filtre.empty:
+        # 1. Ville la plus éloignée en temps (dans df_filtre)
+        idx_max = df_filtre['Temps (min)'].idxmax()
+        ville_plus_loin = df_filtre.loc[idx_max]
+        coord_ville_loin = (ville_plus_loin['Latitude'], ville_plus_loin['Longitude'])
+        # 2. Rayon réel jusqu'à la grande ville la plus éloignée
+        rayon_final_km = geodesic(coord_depart, coord_ville_loin).km
+        # 3. Toutes les villes dans ce cercle
+        df_villes_synthese = villes_dans_rayon_km(df_clean, coord_depart, rayon_final_km)
+        nombre_total_villes = len(df_villes_synthese)
+        population_totale = int(df_villes_synthese['population'].sum())
+        population_totale_str = f"{population_totale:,}".replace(",", ".")
+        population_totale_gd_ville = int(df_filtre['Population'].sum())
+        population_totale_gd_ville_str = f"{population_totale_gd_ville:,}".replace(",", ".")
+        df_stats = pd.DataFrame({
+            "Indicateur": [
+                f"Nombre total de villes dans un rayon de {rayon_final_km:.1f} km (jusqu'à la grande ville la plus éloignée en temps de trajet)",
+                "Population totale dans ce périmètre",
+                "Population totale des grandes villes sélectionnées"
+            ],
+            "Valeur": [nombre_total_villes, population_totale_str, population_totale_gd_ville_str]
+        })
+        st.info(f"Le rayon synthétique est de {rayon_final_km:.1f} km (correspondant à la grande ville la plus éloignée en temps de trajet).")
+    else:
+        nombre_total_villes = len(df_all_in_radius)
+        population_totale = int(df_all_in_radius['population'].sum())
+        population_totale_str = f"{population_totale:,}".replace(",", ".")
+        population_totale_gd_ville = int(df_filtre['Population'].sum())
+        population_totale_gd_ville_str = f"{population_totale_gd_ville:,}".replace(",", ".")
+        df_stats = pd.DataFrame({
+            "Indicateur": ["Nombre total de villes dans le périmètre", "Population totale dans le périmètre", "Population totale des grandes villes"],
+            "Valeur": [nombre_total_villes, population_totale_str, population_totale_gd_ville_str]
+        })
+
+    # Affichage synthèse
+    st.markdown("#### Synthèse dans le périmètre (toutes villes confondues)")
+    st.dataframe(df_stats, hide_index=True)
+
 
     # --- Affichage de la carte Folium ---
     m = folium.Map(location=coord_depart, zoom_start=8)
