@@ -211,6 +211,7 @@ if adresse:
         df_all_in_radius = villes_dans_rayon_km(df_clean, coord_depart, rayon)
         print(type(df_all_in_radius))
         print(df_all_in_radius)
+        print(df_all_in_radius.columns)
         df_filtre = gd_villes_dans_rayon_km(df_all_in_radius, coord_depart, rayon, min_pop, n)
     else:
         iso = ors_client.isochrones(
