@@ -209,6 +209,7 @@ if adresse:
     polygone_recherche = None
     if mode_recherche == "Rayon (km)":
         df_all_in_radius = villes_dans_rayon_km(df_clean, coord_depart, rayon)
+        print(df_all_in_radius.head())
         df_filtre = gd_villes_dans_rayon_km(df_all_in_radius, coord_depart, rayon, min_pop, n)
     else:
         iso = ors_client.isochrones(
