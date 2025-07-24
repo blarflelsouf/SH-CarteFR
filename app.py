@@ -133,7 +133,6 @@ def _agglos(df_temp, n, mode="km"):
         group_stack = [i]
         while group_stack:
             idx = group_stack.pop()
-            print(df_temp.loc[j, ['latitude_mairie', 'longitude_mairie']])
             lat1, lon1 = df_temp.loc[idx, ['latitude_mairie', 'longitude_mairie']]
             for j in range(N):
                 if group_ids[j] != -1:
@@ -210,7 +209,6 @@ if adresse:
     polygone_recherche = None
     if mode_recherche == "Rayon (km)":
         df_all_in_radius = villes_dans_rayon_km(df_clean, coord_depart, rayon)
-        print(df_all_in_radius.head())
         df_filtre = gd_villes_dans_rayon_km(df_all_in_radius, coord_depart, rayon, min_pop, n)
     else:
         iso = ors_client.isochrones(
