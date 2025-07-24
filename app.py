@@ -252,8 +252,8 @@ if adresse:
         iso = ors_client.isochrones(
             locations=[coord_depart_lonlat],
             profile='driving-car',
-            range=[temps_min * 60],
-            intervals=[temps_min * 60],
+            range=[min(temps_min, 60) * 60],
+            intervals=[min(temps_min, 60) * 60],
             units='m'
         )
         polygone_recherche = shape(iso['features'][0]['geometry'])
@@ -261,19 +261,42 @@ if adresse:
         villes_candidates = villes_dans_rayon_km(df_clean, coord_depart, dmax + 5)
         df_all_in_radius = villes_dans_isochrone(villes_candidates, polygone_recherche)
         
+        # 1. Agglos dans isochrone
         df_filtre = gd_villes_dans_isochrone(villes_candidates, min_pop, n, polygone_recherche)
         df_filtre['Temps (min)'] = get_travel_time_batch(ors_client, coord_depart, df_filtre)
-
-        if temps_min > 61:
-            nbr_gds_villes_ss_60_mins = len(df_filtre)
-        obj_grande_villes = n - nbr_gds_villes_ss_60_mins
-        df_villes_sup_60_min = villes_dans_rayon_km(df_clean, coord_depart, 200)
-        df_villes_sup_60_min = df_villes_sup_60_min[df_villes_sup_60_min['population'] > min_pop].copy()
-        df_gds_villes_sup_60_min = df_villes_sup_60_min[~df_villes_sup_60_min['nom_standard'].isin(df_filtre['Ville'])]
-        df_sup_60 = find_villes_dans_temps(ors_client, coord_depart, df_gds_villes_sup_60_min, obj_grande_villes, temps_min)
-        if not df_sup_60.empty:
-            df_sup_60 = df_sup_60.rename(columns={'nom_standard': 'Ville', 'latitude_mairie': 'Latitude', 'longitude_mairie': 'Longitude'})
-            df_filtre = pd.concat([df_filtre, df_sup_60[['Ville', 'Latitude', 'Longitude', 'population', 'reg_nom', 'Temps (min)']]], ignore_index=True)
+    
+        # 2. Compléter avec villes hors isochrone si besoin ET si temps_min > 60
+        if temps_min > 60 and len(df_filtre) < n:
+            obj_grande_villes = n - len(df_filtre)
+            df_villes_sup_60_min = villes_dans_rayon_km(df_clean, coord_depart, 200)
+            df_villes_sup_60_min = df_villes_sup_60_min[df_villes_sup_60_min['population'] > min_pop].copy()
+            # Exclure déjà trouvées (sur le nom standard!)
+            villes_exclues = set(df_filtre['Ville'])
+            df_gds_villes_sup_60_min = df_villes_sup_60_min[~df_villes_sup_60_min['nom_standard'].isin(villes_exclues)]
+            # Vérifier si villes dispo
+            if not df_gds_villes_sup_60_min.empty and obj_grande_villes > 0:
+                # Sélectionne jusqu'à obj_grande_villes éligibles par temps réel
+                df_sup_60 = find_villes_dans_temps(
+                    ors_client, coord_depart, df_gds_villes_sup_60_min, obj_grande_villes, temps_min
+                )
+                if not df_sup_60.empty:
+                    # Harmoniser colonnes pour concat
+                    df_sup_60 = df_sup_60.rename(columns={
+                        'nom_standard': 'Ville',
+                        'latitude_mairie': 'Latitude',
+                        'longitude_mairie': 'Longitude',
+                        'population': 'Population',
+                        'reg_nom': 'Région'
+                    })
+                    # Met à jour les champs absents
+                    for col in ['Région', 'Population']:
+                        if col not in df_sup_60.columns and col.lower() in df_sup_60.columns:
+                            df_sup_60[col] = df_sup_60[col.lower()]
+                    # Ajoute au DataFrame principal
+                    df_filtre = pd.concat(
+                        [df_filtre, df_sup_60[['Ville', 'Latitude', 'Longitude', 'Population', 'Région', 'Temps (min)']]],
+                        ignore_index=True
+                    )
 
         
 
