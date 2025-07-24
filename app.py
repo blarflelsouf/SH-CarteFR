@@ -108,9 +108,6 @@ def villes_dans_isochrone(df_candidates, polygone_isochrone):
 @st.cache_data
 def gd_villes_dans_rayon_km(df_clean, coord_depart, rayon, min_pop, n):
     df_temp = df_clean[df_clean['population'] > min_pop].copy()
-    print(type(df_temp))
-    print(df_temp)
-    print(df_temp.columns)
     return _agglos(df_temp, n, mode="km")
 
 def gd_villes_dans_isochrone(df_clean, min_pop, n, polygone_isochrone):
@@ -136,6 +133,9 @@ def _agglos(df_temp, n, mode="km"):
         group_stack = [i]
         while group_stack:
             idx = group_stack.pop()
+                print(type(df_temp))
+                print(df_temp)
+                print(df_temp.columns)
             lat1, lon1 = df_temp.loc[idx, ['latitude_mairie', 'longitude_mairie']]
             for j in range(N):
                 if group_ids[j] != -1:
