@@ -3,22 +3,17 @@ import pandas as pd
 from opencage.geocoder import OpenCageGeocode
 from geopy.distance import geodesic
 import folium
-from folium.plugins import HeatMap
 from streamlit_folium import st_folium
-import requests
 import urllib.request
 import os
-import numpy as np
 import openrouteservice
 from shapely.geometry import shape, Point
 
-# =======================
 # CONFIGURATION & DATA
-# =======================
-
 OC_API_KEY = st.secrets["OPENCAGE_API_KEY"]
 ORS_API_KEY = st.secrets["ORS_API_KEY"]
 ors_client = openrouteservice.Client(key=ORS_API_KEY)
+PARQUET_FILE = "city_drive_times.parquet"
 
 def telecharger_csv_si_absent(fichier, url):
     if not os.path.exists(fichier):
@@ -32,35 +27,29 @@ telecharger_csv_si_absent(CSV_FICHIER, CSV_URL)
 
 @st.cache_data
 def load_data():
-    df = pd.read_csv('communes-france-2025.csv')
+    df = pd.read_csv(CSV_FICHIER)
     df_clean = df.loc[:, ['nom_standard', 'reg_nom', 'population', 'latitude_mairie', 'longitude_mairie']]
     return df_clean
 
+@st.cache_data
+def load_drive_times():
+    if os.path.exists(PARQUET_FILE):
+        return pd.read_parquet(PARQUET_FILE)
+    return None
+
 def couleur_par_distance(distance):
-    try:
-        if distance is None:
-            return "gray"
-        if distance < 50:
-            return 'green'
-        elif distance < 120:
-            return 'orange'
-        else:
-            return 'red'
-    except:
+    if distance is None:
         return "gray"
+    if distance < 50: return 'green'
+    elif distance < 120: return 'orange'
+    else: return 'red'
 
 def couleur_par_trajet(temps):
-    try:
-        if temps is None:
-            return "gray"
-        if temps < 30:
-            return 'green'
-        elif temps < 80:
-            return 'orange'
-        else:
-            return 'red'
-    except:
+    if temps is None:
         return "gray"
+    if temps < 30: return 'green'
+    elif temps < 80: return 'orange'
+    else: return 'red'
 
 def geocode_adresse(adresse):
     geocoder = OpenCageGeocode(OC_API_KEY)
@@ -72,21 +61,14 @@ def geocode_adresse(adresse):
             details = results[0]['components']
             region = details.get('state')
             country = results[0]['components'].get('country_code', '').upper()
-            return latitude, longitude, region, country
+            ville_norm = (details.get('city') or details.get('town') or
+                          details.get('village') or details.get('municipality'))
+            return latitude, longitude, region, country, ville_norm
         else:
-            return None, None, None, None
+            return None, None, None, None, None
     except Exception as e:
         st.error(f"Erreur géocodage OpenCage : {e}")
         st.stop()
-
-def rayon_max_isochrone(polygone_iso, centre):
-    points = list(polygone_iso.exterior.coords)
-    max_dist = 0
-    for lon, lat in points:
-        d = geodesic(centre, (lat, lon)).km
-        if d > max_dist:
-            max_dist = d
-    return max_dist
 
 @st.cache_data
 def villes_dans_rayon_km(df_clean, coord_depart, rayon):
@@ -95,132 +77,35 @@ def villes_dans_rayon_km(df_clean, coord_depart, rayon):
         lambda row: geodesic(coord_depart, (row['latitude_mairie'], row['longitude_mairie'])).km, axis=1)
     return df_all_in_radius[df_all_in_radius['distance_km'] <= rayon].reset_index(drop=True)
 
-def villes_dans_isochrone(df_candidates, polygone_isochrone):
-    df_all_in_iso = df_candidates.copy()
-    df_all_in_iso['in_isochrone'] = df_all_in_iso.apply(
-        lambda row: polygone_isochrone.contains(Point(row['longitude_mairie'], row['latitude_mairie'])),
-        axis=1
-    )
-    df_all_in_iso = df_all_in_iso[df_all_in_iso['in_isochrone']].reset_index(drop=True)
-    df_all_in_iso['distance_km'] = None
-    return df_all_in_iso
+# -------- NOUVEAU: MULTI-VILLES ENTRÉE -------------
+def parse_ville_list(adresse_str):
+    villes = [a.strip() for a in adresse_str.split(",") if a.strip()]
+    return villes
 
-@st.cache_data
-def gd_villes_dans_rayon_km(df_clean, coord_depart, rayon, min_pop, n):
-    df_temp = df_clean[df_clean['population'] > min_pop].copy()
-    return _agglos(df_temp, n, mode="km")
-
-def gd_villes_dans_isochrone(df_clean, min_pop, n, polygone_isochrone):
-    df_temp = df_clean[df_clean['population'] > min_pop].copy()
-    df_temp['in_isochrone'] = df_temp.apply(
-        lambda row: polygone_isochrone.contains(Point(row['longitude_mairie'], row['latitude_mairie'])),
-        axis=1
-    )
-    df_temp = df_temp[df_temp['in_isochrone']].reset_index(drop=True)
-    df_temp['distance_km'] = None
-    return _agglos(df_temp, n, mode="isochrone")
-
-def _agglos(df_temp, n, mode="km"):
-    N = len(df_temp)
-    if N == 0:
-        return pd.DataFrame()
-    group_ids = np.full(N, -1)
-    current_group = 0
-    df_temp = df_temp.reset_index(drop=True)
-    for i in range(N):
-        if group_ids[i] != -1:
-            continue
-        group_ids[i] = current_group
-        group_stack = [i]
-        while group_stack:
-            idx = group_stack.pop()
-            lat1, lon1 = df_temp.loc[idx, ['latitude_mairie', 'longitude_mairie']]
-            for j in range(N):
-                if group_ids[j] != -1:
-                    continue
-                lat2, lon2 = df_temp.loc[j, ['latitude_mairie', 'longitude_mairie']]
-                distance = geodesic((lat1, lon1), (lat2, lon2)).km
-                if distance < 15:
-                    group_ids[j] = current_group
-                    group_stack.append(j)
-        current_group += 1
-    df_temp['agglomeration'] = group_ids
-
-    agglo = (
-        df_temp.groupby('agglomeration')
-        .apply(lambda g: pd.Series({
-            'Ville': g.loc[g['population'].idxmax()]['nom_standard'],
-            'Latitude': g.loc[g['population'].idxmax()]['latitude_mairie'],
-            'Longitude': g.loc[g['population'].idxmax()]['longitude_mairie'],
-            'Distance (en km)': g.loc[g['population'].idxmax()]['distance_km'] if mode == "km" else None,
-            'Population': int(g['population'].sum()),
-            'Région': g['reg_nom'].mode()[0]
-        }))
-        .reset_index(drop=True)
-    )
-
-    agglo = agglo.sort_values('Population', ascending=False).head(n).reset_index(drop=True)
-    return agglo
-
-def find_villes_dans_temps(ors_client, start_coord, df_gds_villes_sup_60_min, obj_grande_villes, temps_min):
-    """
-    Pour chaque ville candidate, vérifie si elle est accessible en moins de temps_min en voiture.
-    Retourne jusqu'à obj_grande_villes villes éligibles, avec leur temps de trajet.
-    """
-    eligible_rows = []
-
-    for idx, row in df_gds_villes_sup_60_min.iterrows():
-        dest_coord = [row['longitude_mairie'], row['latitude_mairie']]
-        try:
-            route = ors_client.directions(
-                coordinates=[[start_coord[1], start_coord[0]], dest_coord],
-                profile='driving-car',
-                format='geojson'
-            )
-            duration_min = route['features'][0]['properties']['summary']['duration'] / 60
-
-            if duration_min <= temps_min:
-                new_row = row.copy()
-                new_row['Temps (min)'] = duration_min
-                eligible_rows.append(new_row)
-                if len(eligible_rows) >= obj_grande_villes:
-                    break
-        except Exception as e:
-            # print(f"Erreur ORS pour {row['nom_standard']} : {e}")
-            continue
-
-    if eligible_rows:
-        df_eligible = pd.DataFrame(eligible_rows)
-        return df_eligible
-    else:
-        return pd.DataFrame(columns=list(df_gds_villes_sup_60_min.columns) + ['Temps (min)'])
-
-
-
-
-def get_travel_time_batch(ors_client, start_coord, villes_df):
-    times = []
-    for _, row in villes_df.iterrows():
-        try:
-            route = ors_client.directions(
-                coordinates=[[start_coord[1], start_coord[0]], [row['Longitude'], row['Latitude']]],
-                profile='driving-car',
-                format='geojson'
-            )
-            duration = route['features'][0]['properties']['summary']['duration']
-            times.append(duration / 60)  # en minutes
-        except Exception as e:
-            times.append(None)
-    return times
+def find_coords_for_villes(villes, df_clean):
+    """Retourne une liste de tuples (lat, lon, nom, région, pays, ville_norm)"""
+    coords = []
+    for ville in villes:
+        # On tente d'abord par matching exact CSV (pour éviter le geocoding)
+        match = df_clean[df_clean['nom_standard'].str.upper() == ville.upper()]
+        if not match.empty:
+            row = match.iloc[0]
+            coords.append((row['latitude_mairie'], row['longitude_mairie'], row['reg_nom'], 'FR', row['nom_standard']))
+        else:
+            lat, lon, reg, pays, ville_norm = geocode_adresse(ville)
+            if lat is not None:
+                coords.append((lat, lon, reg, pays, ville_norm if ville_norm else ville))
+    return coords
 
 # =======================
 # INTERFACE STREAMLIT
 # =======================
 
 df_clean = load_data()
+drive_times = load_drive_times()
 st.title("Stanhome Regional Explorer")
 st.sidebar.title("Paramètres de la recherche")
-adresse = st.sidebar.text_input("Adresse de départ", value="Paris")
+adresse = st.sidebar.text_input("Adresse de départ (séparer par virgules pour plusieurs villes)", value="Paris")
 mode_recherche = st.sidebar.radio(
     "Mode de recherche",
     options=["Rayon (km)", "Temps de trajet (minutes)"]
@@ -232,259 +117,172 @@ else:
 min_pop = st.sidebar.number_input("Population minimale", min_value=0, value=10000)
 n = st.sidebar.number_input("Nombre d'agglomérations à afficher", min_value=1, max_value=30, value=10)
 
+# -- MAIN CODE
 if adresse:
-    lat, lon, REGION, country = geocode_adresse(adresse)
-    if lat is None:
-        st.error("Adresse non trouvée ou géocodage indisponible.")
+    villes_input = parse_ville_list(adresse)
+    coords_list = find_coords_for_villes(villes_input, df_clean)
+    if not coords_list:
+        st.error("Aucune ville de départ valide.")
         st.stop()
-    if country != "FR":
-        st.warning("Attention : l’adresse saisie n’est pas en France. Le radar ne fonctionne que pour la France.")
-        st.stop()
-    coord_depart = (lat, lon)
-    coord_depart_lonlat = (lon, lat)
+    # On peut avoir plusieurs points de départ
+    used_parquet = False
+    df_final = pd.DataFrame()
+    rayon_max = 0
 
-    polygone_recherche = None
-    if mode_recherche == "Rayon (km)":
-        df_all_in_radius = villes_dans_rayon_km(df_clean, coord_depart, rayon)
-        df_filtre = gd_villes_dans_rayon_km(df_all_in_radius, coord_depart, rayon, min_pop, n)
-        
-    else:
-        iso = ors_client.isochrones(
-            locations=[coord_depart_lonlat],
-            profile='driving-car',
-            range=[min(temps_min, 60) * 60],
-            intervals=[min(temps_min, 60) * 60],
-            units='m'
-        )
-        polygone_recherche = shape(iso['features'][0]['geometry'])
-        dmax = rayon_max_isochrone(polygone_recherche, coord_depart)
-        villes_candidates = villes_dans_rayon_km(df_clean, coord_depart, dmax + 5)
-        df_all_in_radius = villes_dans_isochrone(villes_candidates, polygone_recherche)
-        
-        # 1. Agglos dans isochrone
-        df_filtre = gd_villes_dans_isochrone(villes_candidates, min_pop, n, polygone_recherche)
-        df_filtre['Temps (min)'] = get_travel_time_batch(ors_client, coord_depart, df_filtre)
-    
-        # 2. Compléter avec villes hors isochrone si besoin ET si temps_min > 60
-        if temps_min > 60 and len(df_filtre) < n:
-            obj_grande_villes = n - len(df_filtre)
-            df_villes_sup_60_min = villes_dans_rayon_km(df_clean, coord_depart, 200)
-            df_villes_sup_60_min = df_villes_sup_60_min[df_villes_sup_60_min['population'] > min_pop].copy()
-            # Exclure déjà trouvées (sur le nom standard!)
-            villes_exclues = set(df_filtre['Ville'])
-            df_gds_villes_sup_60_min = df_villes_sup_60_min[~df_villes_sup_60_min['nom_standard'].isin(villes_exclues)]
-            # Vérifier si villes dispo
-            if not df_gds_villes_sup_60_min.empty and obj_grande_villes > 0:
-                # Sélectionne jusqu'à obj_grande_villes éligibles par temps réel
-                df_sup_60 = find_villes_dans_temps(
-                    ors_client, coord_depart, df_gds_villes_sup_60_min, obj_grande_villes, temps_min
-                )
-                if not df_sup_60.empty:
-                    # Harmoniser colonnes pour concat
-                    df_sup_60 = df_sup_60.rename(columns={
-                        'nom_standard': 'Ville',
-                        'latitude_mairie': 'Latitude',
-                        'longitude_mairie': 'Longitude',
-                        'population': 'Population',
-                        'reg_nom': 'Région'
-                    })
-                    # Met à jour les champs absents
-                    for col in ['Région', 'Population']:
-                        if col not in df_sup_60.columns and col.lower() in df_sup_60.columns:
-                            df_sup_60[col] = df_sup_60[col.lower()]
-                    # Ajoute au DataFrame principal
-                    df_filtre = pd.concat(
-                        [df_filtre, df_sup_60[['Ville', 'Latitude', 'Longitude', 'Population', 'Région', 'Temps (min)']]],
-                        ignore_index=True
-                    )
-
-        
-
-        # --- Tableau de synthèse adapté ---
-    if mode_recherche == "Temps de trajet (minutes)" and not df_filtre.empty:
-        # 1. Ville la plus éloignée en temps (dans df_filtre)
-        idx_max = df_filtre['Temps (min)'].idxmax()
-        ville_plus_loin = df_filtre.loc[idx_max]
-        coord_ville_loin = (ville_plus_loin['Latitude'], ville_plus_loin['Longitude'])
-        # 2. Rayon réel jusqu'à la grande ville la plus éloignée
-        rayon_final_km = geodesic(coord_depart, coord_ville_loin).km
-        # 3. Toutes les villes dans ce cercle
-        df_villes_synthese = villes_dans_rayon_km(df_clean, coord_depart, rayon_final_km)
-        nombre_total_villes = len(df_villes_synthese)
-        population_totale = int(df_villes_synthese['population'].sum())
-        population_totale_str = f"{population_totale:,}".replace(",", ".")
-        population_totale_gd_ville = int(df_filtre['Population'].sum())
-        population_totale_gd_ville_str = f"{population_totale_gd_ville:,}".replace(",", ".")
-        df_stats = pd.DataFrame({
-            "Indicateur": [
-                f"Nombre total de villes dans un rayon de {rayon_final_km:.1f} km (jusqu'à la grande ville la plus éloignée en temps de trajet)",
-                "Population totale dans ce périmètre",
-                "Population totale des grandes villes sélectionnées"
-            ],
-            "Valeur": [nombre_total_villes, population_totale_str, population_totale_gd_ville_str]
-        })
-        st.info(f"Le rayon synthétique est de {rayon_final_km:.1f} km (correspondant à la grande ville la plus éloignée en temps de trajet).")
-    else:
-        nombre_total_villes = len(df_all_in_radius)
-        population_totale = int(df_all_in_radius['population'].sum())
-        population_totale_str = f"{population_totale:,}".replace(",", ".")
-        population_totale_gd_ville = int(df_filtre['Population'].sum())
-        population_totale_gd_ville_str = f"{population_totale_gd_ville:,}".replace(",", ".")
-        df_stats = pd.DataFrame({
-            "Indicateur": ["Nombre total de villes dans le périmètre", "Population totale dans le périmètre", "Population totale des grandes villes"],
-            "Valeur": [nombre_total_villes, population_totale_str, population_totale_gd_ville_str]
-        })
-
+    # 1. On essaye d'utiliser le Parquet si possible pour TOUTES les villes
+    if drive_times is not None:
+        dfs = []
+        rayons = []
+        for (lat, lon, reg, pays, ville_norm) in coords_list:
+            villes_parquet = drive_times['ville1'].str.upper().unique()
+            if ville_norm and ville_norm.upper() in villes_parquet:
+                used_parquet = True
+                df_rel = drive_times[drive_times['ville1'].str.upper() == ville_norm.upper()]
+                df_rel = df_rel.merge(df_clean, left_on='ville2', right_on='nom_standard')
+                if mode_recherche == "Rayon (km)":
+                    df_rel = df_rel[df_rel['distance_km'] <= rayon]
+                    df_rel = df_rel[df_rel['population'] > min_pop]
+                    rayons.append(df_rel['distance_km'].max() if not df_rel.empty else 0)
+                else:
+                    df_rel = df_rel[df_rel['temps_min'] <= temps_min]
+                    df_rel = df_rel[df_rel['population'] > min_pop]
+                    rayons.append(df_rel.apply(lambda row: geodesic((lat, lon), (row['latitude_mairie'], row['longitude_mairie'])).km, axis=1).max() if not df_rel.empty else 0)
+                df_rel = df_rel.sort_values("population", ascending=False).head(n)
+                df_rel = df_rel.rename(columns={
+                    "ville2": "Ville",
+                    "latitude_mairie": "Latitude",
+                    "longitude_mairie": "Longitude",
+                    "population": "Population",
+                    "reg_nom": "Région",
+                    "temps_min": "Temps (min)",
+                    "distance_km": "Distance (en km)"
+                })[['Ville', 'Latitude', 'Longitude', 'Population', 'Région', 'Temps (min)', 'Distance (en km)']]
+                dfs.append(df_rel)
+        if dfs:
+            df_final = pd.concat(dfs, ignore_index=True).drop_duplicates(subset=['Ville'])
+            rayon_max = max(rayons) if rayons else rayon
+    # 2. Fallback dynamique si aucune donnée Parquet (au moins pour une des villes)
+    if df_final.empty or not used_parquet:
+        st.warning("Aucun résultat pré-calculé trouvé pour au moins une ville, calcul dynamique en cours (peut être lent).")
+        dfs = []
+        rayons = []
+        for (lat, lon, reg, pays, ville_norm) in coords_list:
+            coord_depart = (lat, lon)
+            if mode_recherche == "Rayon (km)":
+                df_all_in_radius = villes_dans_rayon_km(df_clean, coord_depart, rayon)
+                df_rel = df_all_in_radius[df_all_in_radius['population'] > min_pop].copy()
+                df_rel['Distance (en km)'] = df_rel.apply(lambda row: geodesic(coord_depart, (row['latitude_mairie'], row['longitude_mairie'])).km, axis=1)
+                df_rel = df_rel.sort_values("population", ascending=False).head(n)
+                rayons.append(df_rel['Distance (en km)'].max() if not df_rel.empty else 0)
+            else:
+                # Isochrone ou fallback simple (ici on fait un cercle pour rapidité)
+                df_all_in_radius = villes_dans_rayon_km(df_clean, coord_depart, 200)
+                df_rel = df_all_in_radius[df_all_in_radius['population'] > min_pop].copy()
+                df_rel['Temps (min)'] = np.nan # Placeholder si pas d'appel API
+                # Ici, tu peux plugger ton batch ORS si tu veux
+                df_rel = df_rel.sort_values("population", ascending=False).head(n)
+                rayons.append(df_rel.apply(lambda row: geodesic(coord_depart, (row['latitude_mairie'], row['longitude_mairie'])).km, axis=1).max() if not df_rel.empty else 0)
+            dfs.append(df_rel)
+        if dfs:
+            df_final = pd.concat(dfs, ignore_index=True).drop_duplicates(subset=['Ville'])
+            rayon_max = max(rayons) if rayons else rayon
 
     # --- Affichage de la carte Folium ---
-    m = folium.Map(location=coord_depart, zoom_start=8)
-    # Isochrone (polygone ou cercle)
-    if mode_recherche == "Rayon (km)":
-        folium.Circle(
-            radius=rayon * 1000,
-            location=coord_depart,
-            color="purple",
-            fill=True,
-            fill_opacity=0.1,
-            popup=f"{rayon} km autour de {adresse}"
-        ).add_to(m)
-    else:
-        folium.GeoJson(
-            data=polygone_recherche,
-            style_function=lambda feature: {
-                'fillColor': 'purple',
-                'color': 'purple',
-                'weight': 2,
-                'fillOpacity': 0.15,
-            },
-            name="Isochrone"
-        ).add_to(m)
+    if not df_final.empty:
+        # Calcul centre "moyen" pour la carte
+        mean_lat = np.mean([lat for (lat, lon, *_ ) in coords_list])
+        mean_lon = np.mean([lon for (lat, lon, *_ ) in coords_list])
+        m = folium.Map(location=(mean_lat, mean_lon), zoom_start=7)
 
-    # Heatmap (optionnelle)
-    heatmap_pop = st.sidebar.checkbox("Afficher le mode heatmap")
-    heat_data_pop = [
-        [row['Latitude'], row['Longitude'], row['Population']]
-        for _, row in df_filtre.iterrows()
-        if row['Population'] > 0
-    ]
-    if heatmap_pop and len(heat_data_pop) >= 2:
-        HeatMap(heat_data_pop, min_opacity=0.3, radius=25, blur=15).add_to(m)
+        # Cercles autour de chaque ville de départ
+        for (lat, lon, reg, pays, ville_norm) in coords_list:
+            folium.Circle(
+                radius=rayon_max * 1000,
+                location=(lat, lon),
+                color="purple",
+                fill=True,
+                fill_opacity=0.10,
+                popup=f"{rayon_max:.1f} km autour de {ville_norm}"
+            ).add_to(m)
+            folium.Marker(
+                location=(lat, lon),
+                popup=f"Départ: {ville_norm}",
+                icon=folium.Icon(color="purple")
+            ).add_to(m)
 
-    # Affichage région GeoJSON
-    url_geojson = "https://france-geojson.gregoiredavid.fr/repo/regions.geojson"
-    region_geojson_all = requests.get(url_geojson).json()
-    region_feature = None
-    for feature in region_geojson_all['features']:
-        if feature['properties']['nom'] == REGION:
-            region_feature = feature
-            break
-    if region_feature:
-        region_geojson = {"type": "FeatureCollection", "features": [region_feature]}
-        folium.GeoJson(
-            region_geojson,
-            style_function=lambda feature: {
-                'fillColor': 'none',
-                'color': 'blue',
-                'weight': 2,
-                'dashArray': '5, 5'
-            },
-            name="Frontière région",
-            highlight_function=lambda x: {'weight': 3, 'color': 'yellow'},
-        ).add_to(m)
+        # Marqueurs principales
+        for idx, row in df_final.iterrows():
+            couleur = couleur_par_distance(row['Distance (en km)']) if mode_recherche == "Rayon (km)" else couleur_par_trajet(row.get('Temps (min)', None))
+            popup_info = (
+                f"{row['Ville']} ({row['Distance (en km)']:.1f} km, {row['Population']} hab)" if mode_recherche == "Rayon (km)"
+                else f"{row['Ville']} ({row.get('Temps (min)', 0):.0f} min, {row['Population']} hab)"
+            )
+            folium.Marker(
+                location=[row['Latitude'], row['Longitude']],
+                popup=popup_info,
+                icon=folium.Icon(color=couleur)
+            ).add_to(m)
 
-    # Marker de départ (icône custom)
-    big_icon_url = "https://raw.githubusercontent.com/blarflelsouf/SH-CarteFR/master/logopng.png"
-    custom_icon = folium.CustomIcon(
-        big_icon_url,
-        icon_size=(60, 60),
-        icon_anchor=(30, 60)
-    )
-    folium.Marker(
-        location=coord_depart,
-        popup="Départ",
-        icon=custom_icon
-    ).add_to(m)
+        st.markdown(f"### Carte des {len(df_final)} plus grandes agglomérations autour de {', '.join(villes_input)}")
+        st_folium(m, width=900, height=600)
 
-    # Marqueurs principales
-    for idx, row in df_filtre.iterrows():
+        # --- Tableau HTML coloré ---
         if mode_recherche == "Rayon (km)":
-            couleur = couleur_par_distance(row['Distance (en km)'])
-            popup_info = f"{row['Ville']} ({row['Distance (en km)']} km, {row['Population']} hab)"
+            df_display = df_final[['Ville', 'Distance (en km)', 'Population', 'Région']].copy()
+            df_display["Distance (en km)"] = df_display["Distance (en km)"].apply(lambda x: f"{x:.2f}".replace(".", ",") if x is not None else "-")
         else:
-            temps = row['Temps (min)']
-            couleur = couleur_par_trajet(temps)
-            popup_info = f"{row['Ville']} ({temps:.0f} min, {row['Population']} hab)" if temps is not None else f"{row['Ville']} (- min, {row['Population']} hab)"
-        folium.Marker(
-            location=[row['Latitude'], row['Longitude']],
-            popup=popup_info,
-            icon=folium.Icon(color=couleur)
-        ).add_to(m)
-
-    st.markdown(f"### Carte des {len(df_filtre)} plus grandes agglomérations autour de {adresse}")
-    st_data = st_folium(m, width=900, height=600)
-
-    # --- Tableau HTML coloré ---
-    if mode_recherche == "Rayon (km)":
-        df_display = df_filtre[['Ville', 'Distance (en km)', 'Population', 'Région']].copy()
-        df_display["Distance (en km)"] = df_display["Distance (en km)"].apply(lambda x: f"{x:.2f}".replace(".", ",") if x is not None else "-")
-        df_display["Population"] = df_display["Population"].apply(lambda x: f"{int(x):,}".replace(",", "."))
-    else:
-        df_display = df_filtre[['Ville', 'Temps (min)', 'Population', 'Région']].copy()
-        df_display["Temps (min)"] = df_display["Temps (min)"].apply(lambda x: f"{x:.0f}" if x is not None else "-")
+            df_display = df_final[['Ville', 'Temps (min)', 'Population', 'Région']].copy()
+            df_display["Temps (min)"] = df_display["Temps (min)"].apply(lambda x: f"{x:.0f}" if pd.notnull(x) else "-")
         df_display["Population"] = df_display["Population"].apply(lambda x: f"{int(x):,}".replace(",", "."))
 
-    rows = []
-    for _, row in df_display.iterrows():
+        rows = []
+        for _, row in df_display.iterrows():
+            couleur = couleur_par_distance(float(row["Distance (en km)"].replace(",", "."))) if mode_recherche == "Rayon (km)" else couleur_par_trajet(float(row["Temps (min)"])) if row["Temps (min)"] != "-" else "gray"
+            ville_html = f'<span style="color:{couleur}; font-weight:bold">{row["Ville"]}</span>'
+            if mode_recherche == "Rayon (km)":
+                rows.append(f"<tr><td>{ville_html}</td><td>{row['Distance (en km)']} km</td><td>{row['Population']}</td><td>{row['Région']}</td></tr>")
+            else:
+                rows.append(f"<tr><td>{ville_html}</td><td>{row['Temps (min)']} min</td><td>{row['Population']}</td><td>{row['Région']}</td></tr>")
+        table_html = f"""
+        <table style="width:100%; border-collapse:collapse; font-size: 1.08em;">
+        <thead>
+        <tr style="background-color:#223366; color:white;">
+            <th style="padding:8px; border:1px solid #AAA;">Ville</th>
+            <th style="padding:8px; border:1px solid #AAA;">{"Distance (en km)" if mode_recherche == "Rayon (km)" else "Temps (en min)"}</th>
+            <th style="padding:8px; border:1px solid #AAA;">Population</th>
+            <th style="padding:8px; border:1px solid #AAA;">Région</th>
+        </tr>
+        </thead>
+        <tbody>
+        {''.join(rows)}
+        </tbody>
+        </table>
+        """
+        st.markdown(table_html, unsafe_allow_html=True)
+
+        # --- Synthèse sur l'union des villes trouvées (et pas tout le CSV, cohérent pour plusieurs points) ---
+        st.markdown("#### Synthèse (périmètre cumulé des villes affichées)")
+        nombre_total_villes = len(df_final)
+        population_totale = int(df_final['Population'].replace({np.nan: 0}).sum())
+        population_totale_str = f"{population_totale:,}".replace(",", ".")
+        st.dataframe(pd.DataFrame({
+            "Indicateur": ["Nombre de villes affichées", "Population totale des grandes villes"],
+            "Valeur": [nombre_total_villes, population_totale_str]
+        }), hide_index=True)
+
+        st.sidebar.markdown("---")
+        st.sidebar.markdown("#### Légende des marqueurs")
         if mode_recherche == "Rayon (km)":
-            try:
-                couleur = couleur_par_distance(float(row["Distance (en km)"].replace(",", "."))) if row["Distance (en km)"] != "-" else "gray"
-            except:
-                couleur = "gray"
-            ville_html = f'<span style="color:{couleur}; font-weight:bold">{row["Ville"]}</span>'
-            rows.append(f"<tr><td>{ville_html}</td><td>{row['Distance (en km)']} km</td><td>{row['Population']}</td><td>{row['Région']}</td></tr>")
+            st.sidebar.markdown("""
+            <span style='display:inline-block; width:16px; height:16px; background-color:purple; border-radius:50%; margin-right:8px;'></span> <b>Départ</b><br>
+            <span style='display:inline-block; width:16px; height:16px; background-color:green; border-radius:50%; margin-right:8px;'></span> <b>&lt; 50 km</b><br>
+            <span style='display:inline-block; width:16px; height:16px; background-color:orange; border-radius:50%; margin-right:8px;'></span> <b>&lt; 120 km</b><br>
+            <span style='display:inline-block; width:16px; height:16px; background-color:red; border-radius:50%; margin-right:8px;'></span> <b>&gt; 120 km</b>
+            """, unsafe_allow_html=True)
         else:
-            try:
-                couleur = couleur_par_trajet(float(row["Temps (min)"])) if row["Temps (min)"] != "-" else "gray"
-            except:
-                couleur = "gray"
-            ville_html = f'<span style="color:{couleur}; font-weight:bold">{row["Ville"]}</span>'
-            rows.append(f"<tr><td>{ville_html}</td><td>{row['Temps (min)']} min</td><td>{row['Population']}</td><td>{row['Région']}</td></tr>")
-    table_html = f"""
-    <table style="width:100%; border-collapse:collapse; font-size: 1.08em;">
-    <thead>
-    <tr style="background-color:#223366; color:white;">
-        <th style="padding:8px; border:1px solid #AAA;">Ville</th>
-        <th style="padding:8px; border:1px solid #AAA;">{"Distance (en km)" if mode_recherche == "Rayon (km)" else "Temps (en min)"}</th>
-        <th style="padding:8px; border:1px solid #AAA;">Population</th>
-        <th style="padding:8px; border:1px solid #AAA;">Région</th>
-    </tr>
-    </thead>
-    <tbody>
-    {''.join(rows)}
-    </tbody>
-    </table>
-    """
-    st.markdown(table_html, unsafe_allow_html=True)
-
-    # Tableau synthèse
-    st.markdown("#### Synthèse dans le périmètre (toutes villes confondues)")
-    st.dataframe(df_stats, hide_index=True)
-
-
-    # Légende adaptée
-    st.sidebar.markdown("---")
-    st.sidebar.markdown("#### Légende des marqueurs")
-    if mode_recherche == "Rayon (km)":
-        st.sidebar.markdown("""
-        <span style='display:inline-block; width:16px; height:16px; background-color:purple; border-radius:50%; margin-right:8px;'></span> <b>Départ</b><br>
-        <span style='display:inline-block; width:16px; height:16px; background-color:green; border-radius:50%; margin-right:8px;'></span> <b>&lt; 50 km</b><br>
-        <span style='display:inline-block; width:16px; height:16px; background-color:orange; border-radius:50%; margin-right:8px;'></span> <b>&lt; 120 km</b><br>
-        <span style='display:inline-block; width:16px; height:16px; background-color:red; border-radius:50%; margin-right:8px;'></span> <b>&gt; 120 km</b>
-    """, unsafe_allow_html=True)
-    else:
-        st.sidebar.markdown("""
-        <span style='display:inline-block; width:16px; height:16px; background-color:purple; border-radius:50%; margin-right:8px;'></span> <b>Départ</b><br>
-        <span style='display:inline-block; width:16px; height:16px; background-color:green; border-radius:50%; margin-right:8px;'></span> <b>&lt; 30 mins</b><br>
-        <span style='display:inline-block; width:16px; height:16px; background-color:orange; border-radius:50%; margin-right:8px;'></span> <b>&lt; 80 mins</b><br>
-        <span style='display:inline-block; width:16px; height:16px; background-color:red; border-radius:50%; margin-right:8px;'></span> <b>&gt; 120 mins</b>
-    """, unsafe_allow_html=True)
+            st.sidebar.markdown("""
+            <span style='display:inline-block; width:16px; height:16px; background-color:purple; border-radius:50%; margin-right:8px;'></span> <b>Départ</b><br>
+            <span style='display:inline-block; width:16px; height:16px; background-color:green; border-radius:50%; margin-right:8px;'></span> <b>&lt; 30 mins</b><br>
+            <span style='display:inline-block; width:16px; height:16px; background-color:orange; border-radius:50%; margin-right:8px;'></span> <b>&lt; 80 mins</b><br>
+            <span style='display:inline-block; width:16px; height:16px; background-color:red; border-radius:50%; margin-right:8px;'></span> <b>&gt; 120 mins</b>
+            """, unsafe_allow_html=True)
