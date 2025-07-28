@@ -295,53 +295,44 @@ if adresse:
     """
     st.markdown(table_html, unsafe_allow_html=True)
 
-    # ---------- Tableau synthèse ----------
-        # ---------- Calcul du rayon max et du cercle englobant ----------
-    # On prend la ville la plus éloignée de chaque zone de départ comme point de référence
-    # (en mode rayon OU temps de trajet !)
-    if not df_final.empty:
-        # Pour chaque ville de départ, on regarde la ville la plus éloignée dans la sélection
-        rayon_maxs = []
-        for i, coord in enumerate(coords_list):
-            # Sélectionne les villes qui avaient cette ville comme "ville1" dans le parquet ou calcul
-            villes_zone = df_final.copy()
-            villes_zone['distance_dep'] = villes_zone.apply(
-                lambda row: geodesic(coord, (row['Latitude'], row['Longitude'])).km, axis=1
-            )
-            rayon_maxs.append(villes_zone['distance_dep'].max())
-        # On prend le plus grand rayon trouvé pour couvrir toutes les zones de départ
-        rayon_max = max(rayon_maxs)
 
-        # ---------- Sélectionne toutes les villes dans le cercle rayon_max autour de CHAQUE ville de départ ----------
-        # Pour ne pas compter 2 fois une ville présente dans 2 cercles, on merge
-        dfs_pop_totale = []
-        for coord in coords_list:
-            df_in_circle = villes_dans_rayon_km(df_clean, coord, rayon_max)
-            dfs_pop_totale.append(df_in_circle)
-        df_in_total_radius = pd.concat(dfs_pop_totale, ignore_index=True).drop_duplicates(subset=['nom_standard'])
+    # ---------- Tableau de synthèse par ville de départ (multi-ville) ----------
 
-        nombre_total_villes = len(df_in_total_radius)
-        population_totale = int(df_in_total_radius['population'].sum())
-        population_totale_str = f"{population_totale:,}".replace(",", ".")
-        # Grandes villes (déjà calculées)
-        nombre_grandes_villes = len(df_final)
-        pop_grandes_villes = int(df_final['Population'].sum())
-        pop_grandes_villes_str = f"{pop_grandes_villes:,}".replace(",", ".")
-
-        # ---------- Affiche la synthèse adaptée ----------
-        st.markdown("#### Synthèse dans le périmètre (toutes villes confondues)")
+    for i, ville in enumerate(villes_valides):
+        # Rayon effectif pour cette ville
+        rayon_ville = rayons[i]
+        coord = coords_list[i]
+        nom_norm = noms_normalises[i]
+    
+        # Toutes les villes (grandes + petites) dans le cercle de cette ville
+        df_villes_cercle = villes_dans_rayon_km(df_clean, coord, rayon_ville)
+        nb_villes = len(df_villes_cercle)
+        pop_totale = int(df_villes_cercle['population'].sum())
+        pop_totale_str = f"{pop_totale:,}".replace(",", ".")
+    
+        # Grandes villes sélectionnées dans le cercle
+        grandes_villes = df_final[
+            (df_final['Distance (en km)'] <= rayon_ville) &
+            (df_final['Latitude'].apply(lambda lat: abs(lat-coord[0]) < 1)) # assure proximité géographique, sinon en multi-ville les rayons se recoupent
+        ]
+        pop_grandes_villes = int(grandes_villes['Population'].sum())
+        # Ajoute pop du départ si besoin
+        if nom_norm.upper() not in [v.upper() for v in grandes_villes['Ville']]:
+            pop_depart = int(df_clean[df_clean['nom_standard'].str.upper() == nom_norm.upper()]['population'].sum())
+            pop_grandes_villes += pop_depart
+        pop_grandes_str = f"{pop_grandes_villes:,}".replace(",", ".")
+    
+        st.markdown(f"#### Synthèse autour de **{ville}** (rayon max {rayon_ville:.1f} km)")
         st.dataframe(pd.DataFrame({
             "Indicateur": [
-                f"Nombre total de villes dans le rayon max ({rayon_max:.1f} km)",
-                "Population totale (toutes villes)",
-                "Nombre de grandes villes sélectionnées",
+                f"Nombre total de villes dans le rayon",
+                "Population totale dans le rayon",
                 "Population des grandes villes sélectionnées"
             ],
             "Valeur": [
-                nombre_total_villes,
-                population_totale_str,
-                nombre_grandes_villes,
-                pop_grandes_villes_str
+                nb_villes,
+                pop_totale_str,
+                pop_grandes_str
             ]
         }), hide_index=True)
 
