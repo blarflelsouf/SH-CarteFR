@@ -307,7 +307,7 @@ if adresse:
         pop_totale_net = int(df_total_villes_net['population'].sum())
         pop_totale_net_str = f"{pop_totale_net:,}".replace(",", ".")
     
-        st.markdown("### Synthèse totale (net, sans doublon entre rayons)")
+        st.markdown("### Synthèse totale")
         st.dataframe(pd.DataFrame({
             "Indicateur": [
                 "Nombre total de villes couvertes (unique)",
@@ -363,72 +363,53 @@ if adresse:
     """
     st.markdown(table_html, unsafe_allow_html=True)
 
+    # ======= Option Couverture Optimale =======
+    optimize_cover = st.sidebar.checkbox("Afficher couverture optimale du territoire (>10k hab.)", value=False)
+    
+    if optimize_cover:
+        # --- Calcul des hubs couvrant toutes les villes en moins de SEUIL_MIN ---
+        st.info("Calcul du nombre minimal de hubs couvrant tout le territoire...")
+        all_villes = df_villes['nom_standard'].unique()
+        coord_map = {row['nom_standard']: (row['latitude_mairie'], row['longitude_mairie']) for _, row in df_villes.iterrows()}
+    
+        # Prépare la carte de couverture par ville
+        cover_map = {}
+        for ville in all_villes:
+            voisins = set(drive_times[(drive_times['ville1'] == ville) & (drive_times['temps_min'] <= SEUIL_MIN)]['ville2'])
+            voisins.add(ville)
+            cover_map[ville] = voisins
+    
+        # Algo glouton
+        to_cover = set(all_villes)
+        centres = []
+        centres_cover = []
+        while to_cover:
+            best_centre = max(cover_map.keys(), key=lambda v: len(cover_map[v] & to_cover))
+            covered_now = cover_map[best_centre] & to_cover
+            centres.append(best_centre)
+            centres_cover.append(covered_now)
+            to_cover -= covered_now
+    
+        st.success(f"Nombre minimal de hubs : {len(centres)}")
+        # Visualisation sur la carte existante
+        for idx, centre in enumerate(centres):
+            centre_lat, centre_lon = coord_map[centre]
+            villes_couvertes = df_villes[df_villes['nom_standard'].isin(centres_cover[idx])]
+            distances = villes_couvertes.apply(lambda row: geodesic((centre_lat, centre_lon), (row['latitude_mairie'], row['longitude_mairie'])).km, axis=1)
+            rayon_max = distances.max() if not distances.empty else 0
+    
+            folium.Marker(
+                location=[centre_lat, centre_lon],
+                popup=f"Centre : {centre}<br>Villes couvertes : {len(centres_cover[idx])}",
+                icon=folium.Icon(color="red", icon="star"),
+            ).add_to(m)
+            folium.Circle(
+                radius=rayon_max * 1000,
+                location=[centre_lat, centre_lon],
+                color="purple", fill=True, fill_opacity=0.10,
+                popup=f"{centre} : {rayon_max:.1f} km"
+            ).add_to(m)
 
-    # ---------- Tableau de synthèse par ville de départ (multi-ville) ----------
-
-    nb_villes_total = 0
-    pop_totale_total = 0
-    pop_grandes_villes_total = 0
-    dfs_villes_cercle = []
-    
-    for i, ville in enumerate(villes_valides):
-        rayon_ville = rayons[i]
-        coord = coords_list[i]
-        nom_norm = noms_normalises[i]
-    
-        # Villes (grandes + petites) dans le cercle de cette ville
-        df_villes_cercle = villes_dans_rayon_km(df_clean, coord, rayon_ville)
-        dfs_villes_cercle.append(df_villes_cercle)  # <-- Ajoute à la liste
-    
-        nb_villes = len(df_villes_cercle)
-        pop_totale = int(df_villes_cercle['population'].sum())
-        pop_totale_str = f"{pop_totale:,}".replace(",", ".")
-    
-        # Grandes villes sélectionnées dans le cercle
-        grandes_villes = df_final[
-            (df_final['Distance (en km)'] <= rayon_ville) &
-            (df_final['Latitude'].apply(lambda lat: abs(lat - coord[0]) < 1))
-        ]
-        pop_grandes_villes = int(grandes_villes['Population'].sum())
-        # Ajoute pop du départ si besoin
-        if nom_norm.upper() not in [v.upper() for v in grandes_villes['Ville']]:
-            pop_depart = int(df_clean[df_clean['nom_standard'].str.upper() == nom_norm.upper()]['population'].sum())
-            pop_grandes_villes += pop_depart
-        pop_grandes_str = f"{pop_grandes_villes:,}".replace(",", ".")
-    
-        st.markdown(f"#### Synthèse autour de **{ville}** (rayon max {rayon_ville:.1f} km)")
-        st.dataframe(pd.DataFrame({
-            "Indicateur": [
-                f"Nombre total de villes dans le rayon",
-                "Population totale dans le rayon",
-                "Population des grandes villes sélectionnées"
-            ],
-            "Valeur": [
-                nb_villes,
-                pop_totale_str,
-                pop_grandes_str
-            ]
-        }), hide_index=True)
-
-    # ----------- Synthèse “net” pour l’ensemble -----------
-
-    if dfs_villes_cercle:
-        df_total_villes_net = pd.concat(dfs_villes_cercle, ignore_index=True).drop_duplicates(subset=["nom_standard"])
-        nb_villes_net = len(df_total_villes_net)
-        pop_totale_net = int(df_total_villes_net['population'].sum())
-        pop_totale_net_str = f"{pop_totale_net:,}".replace(",", ".")
-    
-        st.markdown("### Synthèse totale (net, sans doublon entre rayons)")
-        st.dataframe(pd.DataFrame({
-            "Indicateur": [
-                "Nombre total de villes couvertes (unique)",
-                "Population totale couverte (unique)"
-            ],
-            "Valeur": [
-                nb_villes_net,
-                pop_totale_net_str
-            ]
-        }), hide_index=True)
 
 
     # ---------- Légende adaptée ----------
