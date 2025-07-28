@@ -363,53 +363,7 @@ if adresse:
     """
     st.markdown(table_html, unsafe_allow_html=True)
 
-    # ======= Option Couverture Optimale =======
-    optimize_cover = st.sidebar.checkbox("Afficher couverture optimale du territoire (>10k hab.)", value=False)
-    
-    if optimize_cover:
-        # --- Calcul des hubs couvrant toutes les villes en moins de SEUIL_MIN ---
-        st.info("Calcul du nombre minimal de hubs couvrant tout le territoire...")
-        all_villes = dfs['nom_standard'].unique()
-        coord_map = {row['nom_standard']: (row['latitude_mairie'], row['longitude_mairie']) for _, row in df_villes.iterrows()}
-    
-        # Prépare la carte de couverture par ville
-        cover_map = {}
-        for ville in all_villes:
-            voisins = set(drive_times[(drive_times['ville1'] == ville) & (drive_times['temps_min'] <= SEUIL_MIN)]['ville2'])
-            voisins.add(ville)
-            cover_map[ville] = voisins
-    
-        # Algo glouton
-        to_cover = set(all_villes)
-        centres = []
-        centres_cover = []
-        while to_cover:
-            best_centre = max(cover_map.keys(), key=lambda v: len(cover_map[v] & to_cover))
-            covered_now = cover_map[best_centre] & to_cover
-            centres.append(best_centre)
-            centres_cover.append(covered_now)
-            to_cover -= covered_now
-    
-        st.success(f"Nombre minimal de hubs : {len(centres)}")
-        # Visualisation sur la carte existante
-        for idx, centre in enumerate(centres):
-            centre_lat, centre_lon = coord_map[centre]
-            villes_couvertes = df_villes[df_villes['nom_standard'].isin(centres_cover[idx])]
-            distances = villes_couvertes.apply(lambda row: geodesic((centre_lat, centre_lon), (row['latitude_mairie'], row['longitude_mairie'])).km, axis=1)
-            rayon_max = distances.max() if not distances.empty else 0
-    
-            folium.Marker(
-                location=[centre_lat, centre_lon],
-                popup=f"Centre : {centre}<br>Villes couvertes : {len(centres_cover[idx])}",
-                icon=folium.Icon(color="red", icon="star"),
-            ).add_to(m)
-            folium.Circle(
-                radius=rayon_max * 1000,
-                location=[centre_lat, centre_lon],
-                color="purple", fill=True, fill_opacity=0.10,
-                popup=f"{centre} : {rayon_max:.1f} km"
-            ).add_to(m)
-
+   
 
 
     # ---------- Légende adaptée ----------
