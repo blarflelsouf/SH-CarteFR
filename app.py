@@ -34,6 +34,7 @@ def load_data():
 @st.cache_data
 def load_drive_times():
     if os.path.exists(PARQUET_FILE):
+        st.write("Chargement du fichier en cours")
         return pd.read_parquet(PARQUET_FILE)
     return None
 
