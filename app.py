@@ -251,6 +251,74 @@ if adresse:
 
     st.markdown(f"### Carte des {len(df_final)} plus grandes agglomérations autour de {', '.join(villes_valides)}")
     st_data = st_folium(m, width=900, height=600)
+    
+
+    # ---------- Tableau de synthèse par ville de départ (multi-ville) ----------
+
+    nb_villes_total = 0
+    pop_totale_total = 0
+    pop_grandes_villes_total = 0
+    dfs_villes_cercle = []
+    
+    for i, ville in enumerate(villes_valides):
+        rayon_ville = rayons[i]
+        coord = coords_list[i]
+        nom_norm = noms_normalises[i]
+    
+        # Villes (grandes + petites) dans le cercle de cette ville
+        df_villes_cercle = villes_dans_rayon_km(df_clean, coord, rayon_ville)
+        dfs_villes_cercle.append(df_villes_cercle)  # <-- Ajoute à la liste
+    
+        nb_villes = len(df_villes_cercle)
+        pop_totale = int(df_villes_cercle['population'].sum())
+        pop_totale_str = f"{pop_totale:,}".replace(",", ".")
+    
+        # Grandes villes sélectionnées dans le cercle
+        grandes_villes = df_final[
+            (df_final['Distance (en km)'] <= rayon_ville) &
+            (df_final['Latitude'].apply(lambda lat: abs(lat - coord[0]) < 1))
+        ]
+        pop_grandes_villes = int(grandes_villes['Population'].sum())
+        # Ajoute pop du départ si besoin
+        if nom_norm.upper() not in [v.upper() for v in grandes_villes['Ville']]:
+            pop_depart = int(df_clean[df_clean['nom_standard'].str.upper() == nom_norm.upper()]['population'].sum())
+            pop_grandes_villes += pop_depart
+        pop_grandes_str = f"{pop_grandes_villes:,}".replace(",", ".")
+    
+        st.markdown(f"#### Synthèse autour de **{ville}** (rayon max {rayon_ville:.1f} km)")
+        st.dataframe(pd.DataFrame({
+            "Indicateur": [
+                f"Nombre total de villes dans le rayon",
+                "Population totale dans le rayon",
+                "Population des grandes villes sélectionnées"
+            ],
+            "Valeur": [
+                nb_villes,
+                pop_totale_str,
+                pop_grandes_str
+            ]
+        }), hide_index=True)
+
+    # ----------- Synthèse “net” pour l’ensemble -----------
+
+    if dfs_villes_cercle:
+        df_total_villes_net = pd.concat(dfs_villes_cercle, ignore_index=True).drop_duplicates(subset=["nom_standard"])
+        nb_villes_net = len(df_total_villes_net)
+        pop_totale_net = int(df_total_villes_net['population'].sum())
+        pop_totale_net_str = f"{pop_totale_net:,}".replace(",", ".")
+    
+        st.markdown("### Synthèse totale (net, sans doublon entre rayons)")
+        st.dataframe(pd.DataFrame({
+            "Indicateur": [
+                "Nombre total de villes couvertes (unique)",
+                "Population totale couverte (unique)"
+            ],
+            "Valeur": [
+                nb_villes_net,
+                pop_totale_net_str
+            ]
+        }), hide_index=True)
+
 
     # ---------- Tableau HTML coloré ----------
     if mode_recherche == "Rayon (km)":
@@ -298,7 +366,6 @@ if adresse:
 
     # ---------- Tableau de synthèse par ville de départ (multi-ville) ----------
 
-    # --- Synthèse individuelle pour chaque ville (inchangé, ton code) ---
     nb_villes_total = 0
     pop_totale_total = 0
     pop_grandes_villes_total = 0
