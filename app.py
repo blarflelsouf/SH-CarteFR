@@ -366,15 +366,15 @@ if adresse:
 
 
     # ---------- Heatmap optionnelle (pop grandes villes sélectionnées via parquet) ----------
-        heatmap_pop = st.sidebar.checkbox("Afficher le mode heatmap (pop grandes villes)")
-        
-        if heatmap_pop:
-            heat_data_pop = [
-                [row['Latitude'], row['Longitude'], row['Population']]
-                for _, row in df_final.iterrows() if row['Population'] > 0
-            ]
-            if len(heat_data_pop) >= 2:
-                HeatMap(heat_data_pop, min_opacity=0.3, radius=25, blur=15, max_zoom=8).add_to(m)
+    heatmap_pop = st.sidebar.checkbox("Afficher le mode heatmap (pop grandes villes)")
+    
+    if heatmap_pop:
+        heat_data_pop = [
+            [row['Latitude'], row['Longitude'], row['Population']]
+            for _, row in df_final.iterrows() if row['Population'] > 0
+        ]
+        if len(heat_data_pop) >= 2:
+            HeatMap(heat_data_pop, min_opacity=0.3, radius=25, blur=15, max_zoom=8).add_to(m)
 
     # ---------- Légende adaptée ----------
     st.sidebar.markdown("---")
