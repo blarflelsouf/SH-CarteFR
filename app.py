@@ -343,6 +343,26 @@ if adresse:
             ]
         }), hide_index=True)
 
+    # ----------- Synthèse “net” pour l’ensemble -----------
+
+    if dfs_villes_cercle:
+        df_total_villes_net = pd.concat(dfs_villes_cercle, ignore_index=True).drop_duplicates(subset=["nom_standard"])
+        nb_villes_net = len(df_total_villes_net)
+        pop_totale_net = int(df_total_villes_net['population'].sum())
+        pop_totale_net_str = f"{pop_totale_net:,}".replace(",", ".")
+    
+        st.markdown("### Synthèse totale (net, sans doublon entre rayons)")
+        st.dataframe(pd.DataFrame({
+            "Indicateur": [
+                "Nombre total de villes couvertes (unique)",
+                "Population totale couverte (unique)"
+            ],
+            "Valeur": [
+                nb_villes_net,
+                pop_totale_net_str
+            ]
+        }), hide_index=True)
+
 
 
     # ---------- Heatmap optionnelle (pop grandes villes sélectionnées via parquet) ----------
