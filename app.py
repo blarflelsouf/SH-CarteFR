@@ -364,24 +364,6 @@ if adresse:
         }), hide_index=True)
 
 
-
-    # ---------- Heatmap optionnelle (pop grandes villes sélectionnées via parquet) ----------
-
-    show_heatmap = st.sidebar.checkbox("Afficher le mode heatmap sur les villes couvertes (net)")
-    if show_heatmap:
-        # On prend latitude, longitude, population pour toutes les villes uniques couvertes
-        heat_data = [
-            [row['latitude_mairie'], row['longitude_mairie'], row['population']]
-            for _, row in df_total_villes_net.iterrows()
-            if row['population'] > 0
-        ]
-        # Ajoute à la carte (attention à placer APRES la création de 'm')
-        if len(heat_data) >= 2:
-            HeatMap(heat_data, min_opacity=0.3, radius=25, blur=15).add_to(m)
-        else:
-            st.info("Pas assez de données pour afficher la heatmap.")
-
-
     # ---------- Légende adaptée ----------
     st.sidebar.markdown("---")
     st.sidebar.markdown("#### Légende des marqueurs")
