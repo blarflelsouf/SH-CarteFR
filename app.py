@@ -302,27 +302,25 @@ if adresse:
     nb_villes_total = 0
     pop_totale_total = 0
     pop_grandes_villes_total = 0
+    dfs_villes_cercle = []
     
     for i, ville in enumerate(villes_valides):
-        # Rayon effectif pour cette ville
         rayon_ville = rayons[i]
         coord = coords_list[i]
         nom_norm = noms_normalises[i]
     
-        # Toutes les villes (grandes + petites) dans le cercle de cette ville
+        # Villes (grandes + petites) dans le cercle de cette ville
         df_villes_cercle = villes_dans_rayon_km(df_clean, coord, rayon_ville)
+        dfs_villes_cercle.append(df_villes_cercle)  # <-- Ajoute à la liste
+    
         nb_villes = len(df_villes_cercle)
         pop_totale = int(df_villes_cercle['population'].sum())
         pop_totale_str = f"{pop_totale:,}".replace(",", ".")
     
-        # Ajout à la synthèse globale (sans doublon via set pour villes, mais ici simplifié)
-        nb_villes_total += nb_villes
-        pop_totale_total += pop_totale
-    
         # Grandes villes sélectionnées dans le cercle
         grandes_villes = df_final[
             (df_final['Distance (en km)'] <= rayon_ville) &
-            (df_final['Latitude'].apply(lambda lat: abs(lat-coord[0]) < 1))
+            (df_final['Latitude'].apply(lambda lat: abs(lat - coord[0]) < 1))
         ]
         pop_grandes_villes = int(grandes_villes['Population'].sum())
         # Ajoute pop du départ si besoin
@@ -330,7 +328,6 @@ if adresse:
             pop_depart = int(df_clean[df_clean['nom_standard'].str.upper() == nom_norm.upper()]['population'].sum())
             pop_grandes_villes += pop_depart
         pop_grandes_str = f"{pop_grandes_villes:,}".replace(",", ".")
-        pop_grandes_villes_total += pop_grandes_villes
     
         st.markdown(f"#### Synthèse autour de **{ville}** (rayon max {rayon_ville:.1f} km)")
         st.dataframe(pd.DataFrame({
@@ -345,36 +342,25 @@ if adresse:
                 pop_grandes_str
             ]
         }), hide_index=True)
-    
-    # --- Tableau de synthèse global (toutes villes, cumul simple) ---
-    pop_totale_total_str = f"{pop_totale_total:,}".replace(",", ".")
-    pop_grandes_villes_total_str = f"{pop_grandes_villes_total:,}".replace(",", ".")
-    
-    st.markdown(f"### Synthèse GLOBALE (cumul de tous les rayons, chevauchements possibles)")
-    st.dataframe(pd.DataFrame({
-        "Indicateur": [
-            f"Nombre total de villes (somme de chaque cercle)",
-            "Population totale (somme de chaque cercle)",
-            "Population des grandes villes sélectionnées (somme)"
-        ],
-        "Valeur": [
-            nb_villes_total,
-            pop_totale_total_str,
-            pop_grandes_villes_total_str
-        ]
-    }), hide_index=True)
+
 
 
     # ---------- Heatmap optionnelle (pop grandes villes sélectionnées via parquet) ----------
-    heatmap_pop = st.sidebar.checkbox("Afficher le mode heatmap (pop grandes villes)")
-    
-    if heatmap_pop:
-        heat_data_pop = [
-            [row['Latitude'], row['Longitude'], row['Population']]
-            for _, row in df_final.iterrows() if row['Population'] > 0
+
+    show_heatmap = st.sidebar.checkbox("Afficher le mode heatmap sur les villes couvertes (net)")
+    if show_heatmap:
+        # On prend latitude, longitude, population pour toutes les villes uniques couvertes
+        heat_data = [
+            [row['latitude_mairie'], row['longitude_mairie'], row['population']]
+            for _, row in df_total_villes_net.iterrows()
+            if row['population'] > 0
         ]
-        if len(heat_data_pop) >= 2:
-            HeatMap(heat_data_pop, min_opacity=0.3, radius=25, blur=15, max_zoom=8).add_to(m)
+        # Ajoute à la carte (attention à placer APRES la création de 'm')
+        if len(heat_data) >= 2:
+            HeatMap(heat_data, min_opacity=0.3, radius=25, blur=15).add_to(m)
+        else:
+            st.info("Pas assez de données pour afficher la heatmap.")
+
 
     # ---------- Légende adaptée ----------
     st.sidebar.markdown("---")
