@@ -369,7 +369,7 @@ if adresse:
     if optimize_cover:
         # --- Calcul des hubs couvrant toutes les villes en moins de SEUIL_MIN ---
         st.info("Calcul du nombre minimal de hubs couvrant tout le territoire...")
-        all_villes = df_villes['nom_standard'].unique()
+        all_villes = dfs['nom_standard'].unique()
         coord_map = {row['nom_standard']: (row['latitude_mairie'], row['longitude_mairie']) for _, row in df_villes.iterrows()}
     
         # Prépare la carte de couverture par ville
