@@ -103,7 +103,7 @@ if mode_recherche == "Rayon (km)":
     rayon = st.sidebar.slider("Rayon de recherche (km)", 10, 400, 200)
 else:
     temps_min = st.sidebar.slider("Temps de trajet (minutes)", 5, 120, 60)
-min_pop = st.sidebar.number_input("Population minimale", min_value=0, value=10000)
+min_pop = st.sidebar.number_input("Population minimale", min_value=10000, value=10000)
 n = st.sidebar.number_input("Nombre d'agglomérations à afficher", min_value=1, max_value=30, value=10)
 
 # ---------- MULTI-VILLES GESTION ----------
@@ -296,14 +296,54 @@ if adresse:
     st.markdown(table_html, unsafe_allow_html=True)
 
     # ---------- Tableau synthèse ----------
-    nombre_total_villes = len(df_final)
-    population_totale = int(df_final['Population'].sum())
-    population_totale_str = f"{population_totale:,}".replace(",", ".")
-    st.markdown("#### Synthèse dans le périmètre (par villes affichées)")
-    st.dataframe(pd.DataFrame({
-        "Indicateur": ["Nombre de villes affichées", "Population totale des grandes villes"],
-        "Valeur": [nombre_total_villes, population_totale_str]
-    }), hide_index=True)
+        # ---------- Calcul du rayon max et du cercle englobant ----------
+    # On prend la ville la plus éloignée de chaque zone de départ comme point de référence
+    # (en mode rayon OU temps de trajet !)
+    if not df_final.empty:
+        # Pour chaque ville de départ, on regarde la ville la plus éloignée dans la sélection
+        rayon_maxs = []
+        for i, coord in enumerate(coords_list):
+            # Sélectionne les villes qui avaient cette ville comme "ville1" dans le parquet ou calcul
+            villes_zone = df_final.copy()
+            villes_zone['distance_dep'] = villes_zone.apply(
+                lambda row: geodesic(coord, (row['Latitude'], row['Longitude'])).km, axis=1
+            )
+            rayon_maxs.append(villes_zone['distance_dep'].max())
+        # On prend le plus grand rayon trouvé pour couvrir toutes les zones de départ
+        rayon_max = max(rayon_maxs)
+
+        # ---------- Sélectionne toutes les villes dans le cercle rayon_max autour de CHAQUE ville de départ ----------
+        # Pour ne pas compter 2 fois une ville présente dans 2 cercles, on merge
+        dfs_pop_totale = []
+        for coord in coords_list:
+            df_in_circle = villes_dans_rayon_km(df_clean, coord, rayon_max)
+            dfs_pop_totale.append(df_in_circle)
+        df_in_total_radius = pd.concat(dfs_pop_totale, ignore_index=True).drop_duplicates(subset=['nom_standard'])
+
+        nombre_total_villes = len(df_in_total_radius)
+        population_totale = int(df_in_total_radius['population'].sum())
+        population_totale_str = f"{population_totale:,}".replace(",", ".")
+        # Grandes villes (déjà calculées)
+        nombre_grandes_villes = len(df_final)
+        pop_grandes_villes = int(df_final['Population'].sum())
+        pop_grandes_villes_str = f"{pop_grandes_villes:,}".replace(",", ".")
+
+        # ---------- Affiche la synthèse adaptée ----------
+        st.markdown("#### Synthèse dans le périmètre (toutes villes confondues)")
+        st.dataframe(pd.DataFrame({
+            "Indicateur": [
+                f"Nombre total de villes dans le rayon max ({rayon_max:.1f} km)",
+                "Population totale (toutes villes)",
+                "Nombre de grandes villes sélectionnées",
+                "Population des grandes villes sélectionnées"
+            ],
+            "Valeur": [
+                nombre_total_villes,
+                population_totale_str,
+                nombre_grandes_villes,
+                pop_grandes_villes_str
+            ]
+        }), hide_index=True)
 
     # ---------- Légende adaptée ----------
     st.sidebar.markdown("---")
