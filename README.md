@@ -15,4 +15,4 @@ ou Le fichier CSV sera téléchargé automatiquement au lancement de l’app si 
 
 ## Démo en ligne
 
-Bientôt disponible !
+[Ici!](https://sh-cartefr-3qvq47ez9pkcc72nzexnxq.streamlit.app/)
